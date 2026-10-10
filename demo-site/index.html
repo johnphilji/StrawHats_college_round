@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Acme Store</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div class="promo-banner" data-patchwork-id="promo-banner">Free shipping on orders over $50</div>
+  
+  <header class="site-header">
+    <div class="site-logo" data-patchwork-id="site-logo">Acme Store</div>
+    <nav class="site-nav">
+      <a href="/" class="nav-link-home" data-patchwork-id="nav-link-home">Home</a>
+      <a href="/#products" class="nav-link-shop" data-patchwork-id="nav-link-shop">Shop</a>
+      <a href="/#about" class="nav-link-about" data-patchwork-id="nav-link-about">About</a>
+      <a href="/#contact" class="nav-link-contact" data-patchwork-id="nav-link-contact">Contact</a>
+    </nav>
+    <div class="cart-indicator" data-patchwork-id="cart-indicator">Cart (1)</div>
+  </header>
+
+  <main class="main-content">
+    <section class="hero-section">
+      <h1 class="hero-title" data-patchwork-id="hero-title">Gear up for the season</h1>
+      <p class="hero-subtitle" data-patchwork-id="hero-subtitle">Discover our latest collection of premium gear designed for your everyday adventures.</p>
+      <button class="hero-cta" data-patchwork-id="hero-cta" onclick="document.getElementById('products').scrollIntoView()">Shop now</button>
+    </section>
+
+    <div class="content-wrapper">
+      <section id="products" class="products-grid">
+        <!-- Product 1 -->
+        <article class="product-1-card" data-patchwork-id="product-1-card">
+          <div class="product-image">
+            <svg viewBox="0 0 400 300" xmlns="http://www.w3.org/2000/svg"><rect width="100%" height="100%" fill="#e2e8f0"/><text x="50%" y="50%" dominant-baseline="middle" text-anchor="middle" fill="#64748b">Headphones</text></svg>
+          </div>
+          <h2 class="product-1-title" data-patchwork-id="product-1-title">Wireless Headphones</h2>
+          <p class="product-1-price" data-patchwork-id="product-1-price">$59</p>
+          <button type="button" class="btn-add-1" data-patchwork-id="product-1-add-button" data-product="Wireless Headphones" data-price="59">Add to cart</button>
+        </article>
+
+        <!-- Product 2 -->
+        <article class="product-2-card" data-patchwork-id="product-2-card">
+          <div class="product-image">
+            <svg viewBox="0 0 400 300" xmlns="http://www.w3.org/2000/svg"><rect width="100%" height="100%" fill="#e2e8f0"/><text x="50%" y="50%" dominant-baseline="middle" text-anchor="middle" fill="#64748b">Watch</text></svg>
+          </div>
+          <h2 class="product-2-title" data-patchwork-id="product-2-title">Smart Watch</h2>
+          <p class="product-2-price" data-patchwork-id="product-2-price">$89</p>
+          <button type="button" class="btn-add-2" data-patchwork-id="product-2-add-button" data-product="Smart Watch" data-price="89">Add to cart</button>
+        </article>
+
+        <!-- Product 3 -->
+        <article class="product-3-card" data-patchwork-id="product-3-card">
+          <div class="product-image">
+            <svg viewBox="0 0 400 300" xmlns="http://www.w3.org/2000/svg"><rect width="100%" height="100%" fill="#e2e8f0"/><text x="50%" y="50%" dominant-baseline="middle" text-anchor="middle" fill="#64748b">Backpack</text></svg>
+          </div>
+          <h2 class="product-3-title" data-patchwork-id="product-3-title">Travel Backpack</h2>
+          <p class="product-3-price" data-patchwork-id="product-3-price">$39</p>
+          <button type="button" class="btn-add-3" data-patchwork-id="product-3-add-button" data-product="Travel Backpack" data-price="39">Add to cart</button>
+        </article>
+
+        <!-- Product 4 -->
+        <article class="product-4-card" data-patchwork-id="product-4-card">
+          <div class="product-image">
+            <svg viewBox="0 0 400 300" xmlns="http://www.w3.org/2000/svg"><rect width="100%" height="100%" fill="#e2e8f0"/><text x="50%" y="50%" dominant-baseline="middle" text-anchor="middle" fill="#64748b">Lamp</text></svg>
+          </div>
+          <h2 class="product-4-title" data-patchwork-id="product-4-title">Desk Lamp</h2>
+          <p class="product-4-price" data-patchwork-id="product-4-price">$24</p>
+          <button type="button" class="btn-add-4" data-patchwork-id="product-4-add-button" data-product="Desk Lamp" data-price="24">Add to cart</button>
+        </article>
+      </section>
+
+      <aside class="cart-panel" data-patchwork-id="cart-panel">
+        <h2 class="cart-title" data-patchwork-id="cart-title">Your cart</h2>
+        <ul id="cart-list" class="cart-list">
+          <li>1 x Wireless Headphones - $59</li>
+        </ul>
+        <div class="cart-total" data-patchwork-id="cart-total">Total: $59</div>
+        <button type="button" class="btn-checkout" data-patchwork-id="checkout-button">Checkout</button>
+      </aside>
+    </div>
+  </main>
+
+  <footer class="site-footer">
+    <p class="footer-text" data-patchwork-id="footer-text">© 2026 Acme Store</p>
+  </footer>
+
+  <script src="app.js"></script>
+</body>
+</html>
