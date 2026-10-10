@@ -23,6 +23,7 @@ const envSchema = z.object({
   SUPABASE_SECRET_KEY: optionalStringSchema,
   SUPABASE_SERVICE_ROLE_KEY: optionalStringSchema,
   LOG_LEVEL: z.enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace', 'silent']).default('info'),
+  TARGET_REPOSITORY_PATH: optionalStringSchema,
 });
 
 export type Env = z.infer<typeof envSchema>;
