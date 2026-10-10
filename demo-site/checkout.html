@@ -7,18 +7,30 @@
   <link rel="stylesheet" href="styles.css">
 </head>
 <body>
-  <div class="promo-banner" data-patchwork-id="promo-banner">Free shipping on orders over $50</div>
   
   <header class="site-header">
-    <div class="site-logo" data-patchwork-id="site-logo">Acme Store</div>
+    <div class="header-main">
+      <div class="site-logo" data-patchwork-id="site-logo">Acme Store</div>
+      <div class="header-search">
+        <input type="text" placeholder="Search" readonly>
+        <button type="button" aria-label="Search">🔍</button>
+      </div>
+      <div class="header-actions">
+        <div class="action-item">
+          <span class="icon">👤</span> Sign In
+        </div>
+        <div class="cart-indicator" data-patchwork-id="cart-indicator">🛒 Cart (1)</div>
+      </div>
+    </div>
     <nav class="site-nav">
       <a href="index.html" class="nav-link-home" data-patchwork-id="nav-link-home">Home</a>
       <a href="index.html#products" class="nav-link-shop" data-patchwork-id="nav-link-shop">Shop</a>
       <a href="index.html#about" class="nav-link-about" data-patchwork-id="nav-link-about">About</a>
       <a href="index.html#contact" class="nav-link-contact" data-patchwork-id="nav-link-contact">Contact</a>
     </nav>
-    <div class="cart-indicator" data-patchwork-id="cart-indicator">Cart (1)</div>
   </header>
+
+  <div class="promo-banner" data-patchwork-id="promo-banner">50% off select Autoship items</div>
 
   <main class="main-content single-col">
     <section id="order-summary" class="order-summary">

@@ -7,32 +7,56 @@
   <link rel="stylesheet" href="styles.css">
 </head>
 <body>
-  <div class="promo-banner" data-patchwork-id="promo-banner">Free shipping on orders over $50</div>
   
   <header class="site-header">
-    <div class="site-logo" data-patchwork-id="site-logo">Acme Store</div>
+    <div class="header-main">
+      <div class="site-logo" data-patchwork-id="site-logo">Acme Store</div>
+      <div class="header-search">
+        <input type="text" placeholder="Search" readonly>
+        <button type="button" aria-label="Search">🔍</button>
+      </div>
+      <div class="header-actions">
+        <div class="action-item">
+          <span class="icon">👤</span> Sign In
+        </div>
+        <div class="cart-indicator" data-patchwork-id="cart-indicator">🛒 Cart (1)</div>
+      </div>
+    </div>
     <nav class="site-nav">
       <a href="/" class="nav-link-home" data-patchwork-id="nav-link-home">Home</a>
       <a href="/#products" class="nav-link-shop" data-patchwork-id="nav-link-shop">Shop</a>
       <a href="/#about" class="nav-link-about" data-patchwork-id="nav-link-about">About</a>
       <a href="/#contact" class="nav-link-contact" data-patchwork-id="nav-link-contact">Contact</a>
     </nav>
-    <div class="cart-indicator" data-patchwork-id="cart-indicator">Cart (1)</div>
   </header>
+
+  <div class="promo-banner" data-patchwork-id="promo-banner">50% off select Autoship items</div>
 
   <main class="main-content">
     <section class="hero-section">
-      <h1 class="hero-title" data-patchwork-id="hero-title">Gear up for the season</h1>
-      <p class="hero-subtitle" data-patchwork-id="hero-subtitle">Discover our latest collection of premium gear designed for your everyday adventures.</p>
-      <button class="hero-cta" data-patchwork-id="hero-cta" onclick="document.getElementById('products').scrollIntoView()">Shop now</button>
+      <div class="hero-content">
+        <h1 class="hero-title" data-patchwork-id="hero-title">50% off your first order*</h1>
+        <p class="hero-subtitle" data-patchwork-id="hero-subtitle">Save every time. Change anytime.</p>
+        <button class="hero-cta" data-patchwork-id="hero-cta" onclick="document.getElementById('products').scrollIntoView()">Shop now</button>
+      </div>
+      <div class="hero-image-placeholder">
+        <svg viewBox="0 0 800 400" xmlns="http://www.w3.org/2000/svg"><rect width="100%" height="100%" fill="#cde2f2"/><text x="50%" y="50%" dominant-baseline="middle" text-anchor="middle" fill="#6a9ac2" font-size="24">Pets & Boxes</text></svg>
+      </div>
     </section>
+
+    <div class="info-bar">
+      <div class="info-block"><strong>Hi</strong><br><span style="color:#0047c6;">Sign In</span></div>
+      <div class="info-block"><strong>Save 35% Today</strong><br><span style="color:#0047c6;">Set up Autoship</span></div>
+      <div class="info-block"><strong>Recent Order</strong><br><span style="color:#0047c6;">Track Package</span></div>
+      <div class="info-block"><strong>Pharmacy</strong><br><span style="color:#0047c6;">Shop Now</span></div>
+    </div>
 
     <div class="content-wrapper">
       <section id="products" class="products-grid">
         <!-- Product 1 -->
         <article class="product-1-card" data-patchwork-id="product-1-card">
           <div class="product-image">
-            <svg viewBox="0 0 400 300" xmlns="http://www.w3.org/2000/svg"><rect width="100%" height="100%" fill="#e2e8f0"/><text x="50%" y="50%" dominant-baseline="middle" text-anchor="middle" fill="#64748b">Headphones</text></svg>
+            <svg viewBox="0 0 400 300" xmlns="http://www.w3.org/2000/svg"><rect width="100%" height="100%" fill="#f4f4f4"/><text x="50%" y="50%" dominant-baseline="middle" text-anchor="middle" fill="#999">Headphones</text></svg>
           </div>
           <h2 class="product-1-title" data-patchwork-id="product-1-title">Wireless Headphones</h2>
           <p class="product-1-price" data-patchwork-id="product-1-price">$59</p>
@@ -42,7 +66,7 @@
         <!-- Product 2 -->
         <article class="product-2-card" data-patchwork-id="product-2-card">
           <div class="product-image">
-            <svg viewBox="0 0 400 300" xmlns="http://www.w3.org/2000/svg"><rect width="100%" height="100%" fill="#e2e8f0"/><text x="50%" y="50%" dominant-baseline="middle" text-anchor="middle" fill="#64748b">Watch</text></svg>
+            <svg viewBox="0 0 400 300" xmlns="http://www.w3.org/2000/svg"><rect width="100%" height="100%" fill="#f4f4f4"/><text x="50%" y="50%" dominant-baseline="middle" text-anchor="middle" fill="#999">Watch</text></svg>
           </div>
           <h2 class="product-2-title" data-patchwork-id="product-2-title">Smart Watch</h2>
           <p class="product-2-price" data-patchwork-id="product-2-price">$89</p>
@@ -52,7 +76,7 @@
         <!-- Product 3 -->
         <article class="product-3-card" data-patchwork-id="product-3-card">
           <div class="product-image">
-            <svg viewBox="0 0 400 300" xmlns="http://www.w3.org/2000/svg"><rect width="100%" height="100%" fill="#e2e8f0"/><text x="50%" y="50%" dominant-baseline="middle" text-anchor="middle" fill="#64748b">Backpack</text></svg>
+            <svg viewBox="0 0 400 300" xmlns="http://www.w3.org/2000/svg"><rect width="100%" height="100%" fill="#f4f4f4"/><text x="50%" y="50%" dominant-baseline="middle" text-anchor="middle" fill="#999">Backpack</text></svg>
           </div>
           <h2 class="product-3-title" data-patchwork-id="product-3-title">Travel Backpack</h2>
           <p class="product-3-price" data-patchwork-id="product-3-price">$39</p>
@@ -62,7 +86,7 @@
         <!-- Product 4 -->
         <article class="product-4-card" data-patchwork-id="product-4-card">
           <div class="product-image">
-            <svg viewBox="0 0 400 300" xmlns="http://www.w3.org/2000/svg"><rect width="100%" height="100%" fill="#e2e8f0"/><text x="50%" y="50%" dominant-baseline="middle" text-anchor="middle" fill="#64748b">Lamp</text></svg>
+            <svg viewBox="0 0 400 300" xmlns="http://www.w3.org/2000/svg"><rect width="100%" height="100%" fill="#f4f4f4"/><text x="50%" y="50%" dominant-baseline="middle" text-anchor="middle" fill="#999">Lamp</text></svg>
           </div>
           <h2 class="product-4-title" data-patchwork-id="product-4-title">Desk Lamp</h2>
           <p class="product-4-price" data-patchwork-id="product-4-price">$24</p>
