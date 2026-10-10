@@ -23,6 +23,7 @@ function createLogger() {
       paths: [
         'req.headers.authorization',
         'req.headers.cookie',
+        'req.headers.x-patchwork-signature',
         '*.password',
         '*.secret',
         '*.token',
@@ -30,6 +31,7 @@ function createLogger() {
         'DIRECT_URL',
         'SUPABASE_SECRET_KEY',
         'SUPABASE_SERVICE_ROLE_KEY',
+        'INTERNAL_WORKER_SECRET',
       ],
       censor: '[REDACTED]',
     },

@@ -31,7 +31,15 @@ export function createApp() {
   app.use(corsMiddleware());
 
   // Body parsing
-  app.use(express.json({ limit: '1mb' }));
+  app.use(express.json({
+    limit: '1mb',
+    verify: (req, _res, body) => {
+      const request = req as import('express').Request & { rawBody?: Buffer };
+      if (request.originalUrl.startsWith('/api/internal/')) {
+        request.rawBody = Buffer.from(body);
+      }
+    },
+  }));
   app.use(express.urlencoded({ extended: true }));
 
   // API routes – mounted at /api

@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import { getPrisma } from '../../lib/prisma';
 import { AppError } from '../../shared/errors/AppError';
 import type { CreatePatchData, PatchRecord } from './patches.types';
@@ -54,6 +55,16 @@ export const patchesRepository = {
     }) as Promise<PatchRecord | null>;
   },
 
+  async listHistory(projectId: string, patchId: string, skip: number, take: number) {
+    return getPrisma().auditLog.findMany({
+      where: { projectId, patchId },
+      orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+      skip,
+      take,
+      select: { id: true, action: true, message: true, metadata: true, createdAt: true },
+    });
+  },
+
   async updateStatus(
     patch: PatchRecord,
     status: string,
@@ -61,6 +72,9 @@ export const patchesRepository = {
     reviewComment?: string,
   ): Promise<PatchRecord> {
     const prisma = getPrisma();
+    // Bind trusted callbacks to an attempt created by PATCHWORK, rather than
+    // allowing a callback to choose the identifier it claims to complete.
+    const generationId = status === 'GENERATING' ? randomUUID() : undefined;
     const auditByStatus: Record<string, string> = {
       GENERATING: 'PATCH_GENERATION_STARTED',
       GENERATED: 'PATCH_GENERATED',
@@ -80,6 +94,17 @@ export const patchesRepository = {
         where: { id: patch.id, projectId: patch.projectId, status: patch.status },
         data: {
           status,
+          ...(generationId ? {
+            branchName: null,
+            baseCommitSha: null,
+            headCommitSha: null,
+            summary: null,
+            filesChanged: 0,
+            additions: 0,
+            deletions: 0,
+            validationPassed: null,
+            validationDetails: { workflow: { generationId, outcome: 'PENDING', startedAt: new Date().toISOString() }, validation: null },
+          } : {}),
           ...(status === 'APPROVED' || status === 'REJECTED'
             ? { reviewedBy: actorId, reviewedAt: new Date(), reviewComment: reviewComment ?? null }
             : {}),
@@ -95,7 +120,7 @@ export const patchesRepository = {
           actorId,
           action: auditByStatus[status],
           message: `Patch status changed from ${patch.status} to ${status}`,
-          metadata: { from: patch.status, to: status },
+          metadata: { from: patch.status, to: status, ...(generationId ? { generationId } : {}) },
         },
       });
       const updated = await tx.patch.findFirst({

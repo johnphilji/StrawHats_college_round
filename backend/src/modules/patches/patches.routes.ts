@@ -20,6 +20,7 @@ function validate(schema: z.ZodType) {
 router.post('/projects/:projectId/patches', authenticate, validate(createPatchSchema), asyncHandler(patchesController.create));
 router.get('/projects/:projectId/patches', authenticate, validate(z.object({ params: projectPatchParamsSchema })), asyncHandler(patchesController.list));
 router.get('/projects/:projectId/patches/:patchId', authenticate, validate(z.object({ params: patchParamsSchema })), asyncHandler(patchesController.get));
+router.get('/projects/:projectId/patches/:patchId/history', authenticate, validate(z.object({ params: patchParamsSchema })), asyncHandler(patchesController.history));
 router.patch('/projects/:projectId/patches/:patchId/status', authenticate, validate(updatePatchStatusSchema), asyncHandler(patchesController.updateStatus));
 
 export default router;

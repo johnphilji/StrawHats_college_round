@@ -97,6 +97,21 @@ describe('Patch API', () => {
     expect(patchesService.updateStatus).toHaveBeenCalledWith('project-1', 'patch-1', 'user-1', 'APPROVED', 'Looks good');
   });
 
+  it('returns only the server-created generation correlation ID when generation starts', async () => {
+    const generationId = 'b87e8488-986c-4c06-bd12-bcc2fc49d928';
+    vi.mocked(patchesService.updateStatus).mockResolvedValue(patch({
+      status: 'GENERATING',
+      validationDetails: { workflow: { generationId, outcome: 'PENDING' }, validation: null, privateLog: 'hidden' },
+    }) as never);
+    const res = await request(app).patch('/api/projects/project-1/patches/patch-1/status')
+      .set('Authorization', 'Bearer valid').send({ status: 'GENERATING' });
+
+    expect(res.status).toBe(200);
+    expect(res.body.data.generationId).toBe(generationId);
+    expect(res.body.data).not.toHaveProperty('validationDetails');
+    expect(JSON.stringify(res.body)).not.toContain('privateLog');
+  });
+
   it('rejects a status payload that could claim a workflow result', async () => {
     const res = await request(app).patch('/api/projects/project-1/patches/patch-1/status')
       .set('Authorization', 'Bearer valid').send({ status: 'DEPLOYED', headCommitSha: 'forged-sha' });

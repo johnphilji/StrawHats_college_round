@@ -24,9 +24,14 @@ const envSchema = z.object({
   SUPABASE_SERVICE_ROLE_KEY: optionalStringSchema,
   LOG_LEVEL: z.enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace', 'silent']).default('info'),
   TARGET_REPOSITORY_PATH: optionalStringSchema,
-  // Patch provider for the local edit pipeline. Only 'mock' is implemented;
-  // unknown names fail fast instead of silently falling back.
+  // Keep mock explicit by default; providers validate their own credentials.
   LLM_PROVIDER: z.string().default('mock'),
+  GROQ_API_KEY: optionalStringSchema,
+  GROQ_MODEL: optionalStringSchema,
+  GITHUB_APP_ID: optionalStringSchema,
+  GITHUB_APP_SLUG: optionalStringSchema,
+  GITHUB_APP_PRIVATE_KEY: optionalStringSchema,
+  INTERNAL_WORKER_SECRET: optionalStringSchema,
 });
 
 export type Env = z.infer<typeof envSchema>;

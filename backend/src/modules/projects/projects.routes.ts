@@ -3,7 +3,7 @@ import { authenticate } from '../../middleware/authenticate';
 import { projectsController } from './projects.controller';
 import { asyncHandler } from '../../shared/utils/async-handler';
 import { z } from 'zod';
-import { createProjectSchema, projectIdParamSchema } from './projects.schema';
+import { createProjectSchema, projectIdParamSchema, updateProjectSchema } from './projects.schema';
 
 const router = Router();
 
@@ -49,5 +49,7 @@ router.get(
   },
   asyncHandler(projectsController.getById)
 );
+
+router.patch('/:id', validate(updateProjectSchema), asyncHandler(projectsController.update));
 
 export default router;

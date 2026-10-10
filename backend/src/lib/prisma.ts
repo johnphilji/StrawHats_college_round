@@ -1,18 +1,17 @@
 import { PrismaPg } from '@prisma/adapter-pg';
-import { logger } from '../config/logger';
 // PrismaClient import is lazy to avoid hard failure when generated client not yet present (e.g. in tests without DB)
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 let PrismaClient: any;
+let prismaClientLoadError: unknown;
 try {
-  // Prisma v7 generates to ../generated/prisma – import is relative to src/lib
-  // After `prisma generate`, client is at generated/prisma/client.ts (and compiled to .js via tsc)
+  // Prisma v7 generates TypeScript into generated/prisma. The production build
+  // compiles that tree next to dist/src so this resolves to dist/generated.
   PrismaClient = require('../../generated/prisma/client').PrismaClient;
-} catch {
+} catch (clientEntryError) {
   try {
     PrismaClient = require('../../generated/prisma').PrismaClient;
-  } catch {
-    // Fallback for type-checking / when `prisma generate` hasn't run yet
-    // This will be resolved at runtime after generation; `getPrisma` will throw a clear error if missing
+  } catch (directoryEntryError) {
+    prismaClientLoadError = directoryEntryError ?? clientEntryError;
     PrismaClient = null;
   }
 }
@@ -20,15 +19,21 @@ try {
 let prismaInstance: any | null = null;
 let adapterInstance: PrismaPg | null = null;
 
-function createAdapter(): PrismaPg | null {
+function createAdapter(): PrismaPg {
   const url = process.env.DATABASE_URL;
-  if (!url) return null;
+  if (!url) {
+    throw new Error(
+      'DATABASE_URL is not set. Configure a PostgreSQL connection string in the backend environment.'
+    );
+  }
   try {
     adapterInstance = new PrismaPg({ connectionString: url });
     return adapterInstance;
   } catch (err) {
-    logger.error({ err }, 'Failed to create PrismaPg adapter');
-    return null;
+    throw new Error(
+      'Failed to initialize the PostgreSQL adapter. Check that DATABASE_URL is a valid PostgreSQL connection string.',
+      { cause: err }
+    );
   }
 }
 
@@ -37,7 +42,8 @@ export function getPrisma(): any {
 
   if (!PrismaClient) {
     throw new Error(
-      'PrismaClient not generated – run `npm run prisma:generate` after `npm install`. Expected output at generated/prisma.'
+      'Prisma Client could not be loaded. Run `npm run prisma:generate` and `npm run build` in the backend directory. Check that generated/prisma/client.ts and its dependencies are present.',
+      { cause: prismaClientLoadError }
     );
   }
 
@@ -49,12 +55,15 @@ export function getPrisma(): any {
   }
 
   const adapter = adapterInstance ?? createAdapter();
-  if (!adapter) {
-    throw new Error('Failed to create Prisma Postgres adapter');
+  try {
+    prismaInstance = new PrismaClient({ adapter });
+    return prismaInstance;
+  } catch (err) {
+    throw new Error(
+      'Failed to initialize Prisma Client with the PostgreSQL adapter. Check DATABASE_URL and run `npm run prisma:generate`.',
+      { cause: err }
+    );
   }
-
-  prismaInstance = new PrismaClient({ adapter });
-  return prismaInstance;
 }
 
 export function isPrismaConfigured(): boolean {
@@ -70,13 +79,9 @@ export async function disconnectPrisma(): Promise<void> {
   }
 }
 
-// Lazy getter for convenience – returns instance or null without throwing if not configured
+// Legacy helper name retained for callers; initialization failures are propagated.
 export function getPrismaOrNull(): any | null {
-  try {
-    return getPrisma();
-  } catch {
-    return null;
-  }
+  return getPrisma();
 }
 
 export const prisma = {

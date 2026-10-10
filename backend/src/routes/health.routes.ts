@@ -24,7 +24,7 @@ router.get('/', async (_req, res) => {
     } catch (err) {
       checks.database = {
         status: 'error',
-        message: err instanceof Error ? err.message : String(err),
+        message: 'Database health check failed. Check backend database configuration and Prisma initialization.',
       };
     }
   }

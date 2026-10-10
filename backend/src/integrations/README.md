@@ -4,9 +4,9 @@ External systems are encapsulated here. No SDK calls should leak into controller
 
 ## Layout
 
-- `llm/` – LLM code-diff generation (prompt building, diff validation). Keep credentials server-side; never execute LLM-generated code in the Express process.
-- `github/` – GitHub App / OAuth, branch creation, commit, PR, merge. Use Octokit with narrow scopes.
-- `vercel/` – Preview and production deployment triggers, deployment polling.
+- `llm/` — no provider integration is implemented. Keep future credentials server-side; never execute LLM-generated code in the Express process.
+- GitHub App repository access currently lives in `src/services/github-app.service.ts`. It lists repositories authorized to the installation, retrieves metadata, and reads bounded source files. It can create `patchwork/` refs, commit validated UTF-8 source files without force updates, and open pull requests. It never merges, deletes branches, or writes to protected/default branches. Dashboard permissions are required; see `backend/API.md`.
+- `vercel/` — no provider integration is implemented. Deployment APIs currently track records and accept signed worker/provider status callbacks; they do not trigger or poll Vercel.
 - `playwright/` – Smoke verification of candidate releases.
 
 Each integration exposes a small interface / adapter to make testing easy:
@@ -17,4 +17,4 @@ export interface LlmPort {
 }
 ```
 
-Add environment variables only when the integration is implemented.
+Add environment variables only when the corresponding provider integration is implemented. Current GitHub App and worker variables are documented in `backend/.env.example` and `backend/API.md`.
