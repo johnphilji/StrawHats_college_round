@@ -6,8 +6,73 @@
       "targetUrl": "http://localhost:4000"
     }
   ],
-  "patches": [],
+  "patches": [
+    {
+      "name": "Editor Patch 5:15:43 PM",
+      "status": "draft",
+      "version": "1.0",
+      "operations": [
+        {
+          "id": "zjmcrvx",
+          "selector": "button",
+          "targetFingerprint": "{\"tag\":\"button\",\"text\":\"add to cart\",\"id\":\"\",\"classes\":[],\"attributes\":{},\"ancestors\":[\"div\",\"div\",\"main\",\"body\"],\"siblingText\":\"$199.00\",\"index\":2}",
+          "operationType": "setStyle",
+          "property": "color",
+          "originalValue": "rgb(0, 0, 0)",
+          "newValue": "rgb(346, 0, 0)"
+        },
+        {
+          "id": "i8v6xyp",
+          "selector": "button",
+          "targetFingerprint": "{\"tag\":\"button\",\"text\":\"add to cart\",\"id\":\"\",\"classes\":[],\"attributes\":{},\"ancestors\":[\"div\",\"div\",\"main\",\"body\"],\"siblingText\":\"$199.00\",\"index\":2}",
+          "operationType": "setText",
+          "originalValue": "Add to cart",
+          "newValue": "Add to carttty"
+        }
+      ],
+      "id": "PT-5oicz60",
+      "siteId": "acme",
+      "createdAt": "2026-10-10T11:45:43.961Z"
+    },
+    {
+      "name": "Editor Patch 5:16:21 PM",
+      "status": "draft",
+      "version": "1.0",
+      "operations": [
+        {
+          "id": "3x82ifn",
+          "selector": "button",
+          "targetFingerprint": "{\"tag\":\"button\",\"text\":\"add to cart\",\"id\":\"\",\"classes\":[],\"attributes\":{},\"ancestors\":[\"div\",\"div\",\"main\",\"body\"],\"siblingText\":\"$99.00\",\"index\":2}",
+          "operationType": "setText",
+          "originalValue": "Add to cart",
+          "newValue": "Add to cartty"
+        }
+      ],
+      "id": "PT-ywheeey",
+      "siteId": "acme",
+      "createdAt": "2026-10-10T11:46:21.901Z"
+    }
+  ],
   "releases": [],
   "telemetry": [],
-  "audit": []
+  "audit": [
+    {
+      "id": "EVT-04h1s3l",
+      "prevHash": "0000000000000000000000000000000000000000000000000000000000000000",
+      "hash": "cfa130e7e82227dfde13ea8bae42fedc89f6c5dce4ca7b86a3b96da7ec0ccf39",
+      "timestamp": "2026-10-10T11:45:43.963Z",
+      "action": "CreatePatch",
+      "resourceType": "Patch",
+      "resourceId": "PT-5oicz60"
+    },
+    {
+      "id": "EVT-jg66clv",
+      "prevHash": "cfa130e7e82227dfde13ea8bae42fedc89f6c5dce4ca7b86a3b96da7ec0ccf39",
+      "hash": "bb87c79d0c629f0effc66e55ddf657571ccd4094c41880bfdb1522d16bea0a5a",
+      "timestamp": "2026-10-10T11:46:21.901Z",
+      "action": "CreatePatch",
+      "resourceType": "Patch",
+      "resourceId": "PT-ywheeey"
+    }
+  ]
 }
