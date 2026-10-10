@@ -7,9 +7,6 @@ import { createProjectSchema, projectIdParamSchema } from './projects.schema';
 
 const router = Router();
 
-// All project routes require authentication
-router.use(authenticate);
-
 // Validate helper
 function validate(schema: z.ZodSchema) {
   return (req: import('express').Request, _res: import('express').Response, next: import('express').NextFunction) => {
@@ -32,16 +29,18 @@ function validate(schema: z.ZodSchema) {
 // POST /api/projects – create
 router.post(
   '/',
+  authenticate,
   validate(createProjectSchema),
   asyncHandler(projectsController.create)
 );
 
 // GET /api/projects – list own projects
-router.get('/', asyncHandler(projectsController.list));
+router.get('/', authenticate, asyncHandler(projectsController.list));
 
 // GET /api/projects/:id – get single (owner-checked)
 router.get(
   '/:id',
+  authenticate,
   (req, _res, next) => {
     const parsed = projectIdParamSchema.safeParse(req.params);
     if (!parsed.success) return next(parsed.error);
