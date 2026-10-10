@@ -1,0 +1,31 @@
+// Prisma schema for PATCHWORK – minimal foundation
+// Learn more: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client"
+  output   = "../generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// Owner identity is derived from Supabase Auth JWT (auth.users).
+// We store ownerId as String (Supabase user UUID) without a FK to auth.users
+// because Supabase manages its own auth schema and cross-schema FKs require special setup.
+// If you provision Supabase with linked DB, you may add a FK constraint later.
+
+model Project {
+  id                   String   @id @default(cuid())
+  name                 String
+  repositoryUrl        String?  @map("repository_url")
+  repositoryIdentifier String?  @map("repository_identifier")
+  productionBranch     String   @default("main") @map("production_branch")
+  ownerId              String   @map("owner_id")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([ownerId])
+  @@map("projects")
+}

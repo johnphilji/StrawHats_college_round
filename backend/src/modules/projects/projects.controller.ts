@@ -1,0 +1,59 @@
+import type { Request, Response, NextFunction } from 'express';
+import { projectsService } from './projects.service';
+
+export const projectsController = {
+  async create(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      // Zod validation already handled in route, but we re-validate body from req
+      const { name, repositoryUrl, repositoryIdentifier, productionBranch } = req.body as {
+        name: string;
+        repositoryUrl?: string;
+        repositoryIdentifier?: string;
+        productionBranch?: string;
+      };
+      const ownerId = req.user!.id;
+
+      const project = await projectsService.createProject({
+        name,
+        repositoryUrl,
+        repositoryIdentifier,
+        productionBranch,
+        ownerId,
+      });
+
+      res.status(201).json({
+        success: true,
+        data: project,
+      });
+    } catch (err) {
+      next(err);
+    }
+  },
+
+  async list(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const ownerId = req.user!.id;
+      const projects = await projectsService.listProjects(ownerId);
+      res.status(200).json({
+        success: true,
+        data: projects,
+      });
+    } catch (err) {
+      next(err);
+    }
+  },
+
+  async getById(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const { id } = req.params as { id: string };
+      const requesterId = req.user!.id;
+      const project = await projectsService.getProjectById(id, requesterId);
+      res.status(200).json({
+        success: true,
+        data: project,
+      });
+    } catch (err) {
+      next(err);
+    }
+  },
+};

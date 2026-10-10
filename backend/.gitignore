@@ -1,0 +1,10 @@
+node_modules
+dist
+generated
+.env
+.env.local
+*.log
+.DS_Store
+coverage
+prisma/migrations
+!prisma/migrations/.gitkeep
