@@ -4,6 +4,7 @@ import fs from 'fs';
 import path from 'path';
 import os from 'os';
 import { createApp } from '../../src/app';
+import { resetEnvCache } from '../../src/config/env';
 
 describe('Component Routes API Integration', () => {
   const app = createApp();
@@ -16,15 +17,18 @@ describe('Component Routes API Integration', () => {
     const compDir = path.join(tempRepoDir, 'src', 'components');
     fs.mkdirSync(compDir, { recursive: true });
     fs.writeFileSync(
-      path.join(compDir, 'Hero.tsx'),
+      path.join(compDir, 'Hero.jsx'),
       'export const Hero = () => <h1>Hero Component</h1>;\n',
       'utf8'
     );
     process.env.TARGET_REPOSITORY_PATH = tempRepoDir;
+    // getEnv() caches on first use (e.g. at createApp time); re-read the override.
+    resetEnvCache();
   });
 
   afterAll(() => {
     process.env.TARGET_REPOSITORY_PATH = originalRepoPath;
+    resetEnvCache();
     try {
       fs.rmSync(tempRepoDir, { recursive: true, force: true });
     } catch {
@@ -54,17 +58,17 @@ describe('Component Routes API Integration', () => {
 
   describe('GET /api/components/:componentId', () => {
     it('returns 200 and safe metadata for a registered editable component', async () => {
-      const res = await request(app).get('/api/components/sample-hero-title');
+      const res = await request(app).get('/api/components/hero-heading');
 
       expect(res.status).toBe(200);
       expect(res.body.success).toBe(true);
       expect(res.body.data).toEqual({
-        id: 'sample-hero-title',
+        id: 'hero-heading',
         componentName: 'Hero',
         editable: true,
         editableScope: 'content',
         allowedOperations: ['text', 'typography', 'styling'],
-        description: 'Main hero section heading',
+        description: 'Main hero H1: restaurant name.',
         framework: 'react',
       });
 
@@ -82,13 +86,13 @@ describe('Component Routes API Integration', () => {
       expect(res.body.error.message).toContain('unknown-component-id');
     });
 
-    it('returns 403 FORBIDDEN for a registered non-editable component', async () => {
-      const res = await request(app).get('/api/components/sample-readonly-footer');
+    it('returns 404 NOT_FOUND for a rendered-but-unregistered element ID', async () => {
+      // e.g. review cards on the target site carry no data-patchwork-id mapping
+      const res = await request(app).get('/api/components/review-card-1');
 
-      expect(res.status).toBe(403);
+      expect(res.status).toBe(404);
       expect(res.body.success).toBe(false);
-      expect(res.body.error.code).toBe('FORBIDDEN');
-      expect(res.body.error.message).toContain('non-editable');
+      expect(res.body.error.code).toBe('NOT_FOUND');
     });
 
     it('returns 400 BAD_REQUEST for an empty or whitespace component ID', async () => {
@@ -102,18 +106,18 @@ describe('Component Routes API Integration', () => {
 
   describe('GET /api/components/:componentId/source', () => {
     it('returns 200 with resolved component context including source code in dev/test', async () => {
-      const res = await request(app).get('/api/components/sample-hero-title/source');
+      const res = await request(app).get('/api/components/hero-heading/source');
 
       expect(res.status).toBe(200);
       expect(res.body.success).toBe(true);
-      expect(res.body.data.componentId).toBe('sample-hero-title');
-      expect(res.body.data.filePath).toBe('src/components/Hero.tsx');
+      expect(res.body.data.componentId).toBe('hero-heading');
+      expect(res.body.data.filePath).toBe('src/components/Hero.jsx');
       expect(res.body.data.sourceCode).toContain('Hero Component');
     });
 
     it('returns 404 for missing source file', async () => {
-      // sample-primary-button file is not created in tempRepoDir
-      const res = await request(app).get('/api/components/sample-primary-button/source');
+      // navbar-cta maps to Navbar.jsx, which is not created in tempRepoDir
+      const res = await request(app).get('/api/components/navbar-cta/source');
 
       expect(res.status).toBe(404);
       expect(res.body.success).toBe(false);

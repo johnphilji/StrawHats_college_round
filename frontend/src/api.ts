@@ -484,6 +484,12 @@ export function generateCodeChange(
     diff,
     modifiedFiles,
     explanation,
+    provider: 'legacy-mock',
+    simulated: true,
+    validationErrors: [],
+    validationWarnings: ['Legacy mock output: no backend validation was performed.'],
+    targetUnchanged: false,
+    isolatedPreviewApplied: false,
     previewApplied,
   };
 }

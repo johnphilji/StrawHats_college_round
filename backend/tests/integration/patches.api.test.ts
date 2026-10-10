@@ -99,7 +99,7 @@ describe('Patch API', () => {
 
   it('rejects a status payload that could claim a workflow result', async () => {
     const res = await request(app).patch('/api/projects/project-1/patches/patch-1/status')
-      .set('Authorization', 'Bearer valid').send({ status: 'GENERATED', headCommitSha: 'forged-sha' });
+      .set('Authorization', 'Bearer valid').send({ status: 'DEPLOYED', headCommitSha: 'forged-sha' });
     expect(res.status).toBe(422);
     expect(patchesService.updateStatus).not.toHaveBeenCalled();
   });

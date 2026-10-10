@@ -63,6 +63,9 @@ export class SourceService {
       allowedOperations: entry.allowedOperations,
       description: entry.description,
       framework: entry.framework,
+      route: entry.route,
+      dataSource: entry.dataSource,
+      notes: entry.notes,
     };
   }
 }

@@ -91,6 +91,14 @@ export interface CodeChange {
   diff: string;
   modifiedFiles: string[];
   explanation: string;
+  /** Patch provider that produced the diff ('mock' until a real LLM lands). */
+  provider: string;
+  /** True when the diff is simulated local output — never real LLM output. */
+  simulated: boolean;
+  validationErrors: string[];
+  validationWarnings: string[];
+  targetUnchanged: boolean;
+  isolatedPreviewApplied: boolean;
   previewApplied: {
     text?: string;
     backgroundColor?: string;

@@ -63,9 +63,16 @@ export const patchesRepository = {
     const prisma = getPrisma();
     const auditByStatus: Record<string, string> = {
       GENERATING: 'PATCH_GENERATION_STARTED',
+      GENERATED: 'PATCH_GENERATED',
       VALIDATING: 'PATCH_VALIDATION_STARTED',
+      VALIDATION_FAILED: 'PATCH_VALIDATION_FAILED',
+      READY_FOR_REVIEW: 'PATCH_VALIDATED',
       APPROVED: 'PATCH_APPROVED',
       REJECTED: 'PATCH_REJECTED',
+      MERGED: 'PATCH_MERGED',
+      // No dedicated PATCH_FAILED audit action exists; the transition message
+      // and metadata still record the exact from → FAILED change.
+      FAILED: 'PATCH_CANCELLED',
       CANCELLED: 'PATCH_CANCELLED',
     };
     return prisma.$transaction(async (tx: any) => {

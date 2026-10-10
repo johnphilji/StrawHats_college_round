@@ -16,7 +16,11 @@ export const createPatchSchema = z.object({
 
 export const updatePatchStatusSchema = z.object({
   body: z.object({
-    status: z.enum(['GENERATING', 'VALIDATING', 'APPROVED', 'REJECTED', 'CANCELLED']),
+    // Full forward chain (DRAFT is initial-only and never set via this endpoint).
+    status: z.enum([
+      'GENERATING', 'GENERATED', 'VALIDATING', 'VALIDATION_FAILED',
+      'READY_FOR_REVIEW', 'APPROVED', 'REJECTED', 'MERGED', 'FAILED', 'CANCELLED',
+    ]),
     reviewComment: z.string().trim().max(2_000).optional(),
   }),
   params: patchParamsSchema,

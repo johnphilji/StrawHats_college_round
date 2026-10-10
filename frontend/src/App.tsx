@@ -16,7 +16,6 @@ export default function App() {
   const [currentWebsite, setCurrentWebsite] = useState<ConnectedWebsite>(MOCK_WEBSITES[0]);
   const [selected, setSelected]             = useState<SelectedComponent | null>(null);
   const [activeChange, setActiveChange]     = useState<CodeChange | null>(null);
-  const [isDomMutated, setIsDomMutated]     = useState(false);
 
   const handleSelectWebsite = useCallback((site: ConnectedWebsite) => {
     setCurrentWebsite(site);
@@ -34,10 +33,6 @@ export default function App() {
 
   const handleClearSelection = useCallback(() => {
     setSelected(null);
-  }, []);
-
-  const toggleDomMutation = useCallback(() => {
-    setIsDomMutated(prev => !prev);
   }, []);
 
   const handleReleaseSuccess = useCallback((deployedChange: CodeChange) => {
@@ -112,14 +107,12 @@ export default function App() {
 
           {activeView === 'editor' && (
             <div className="editor-layout">
-              {/* Center: Interactive Website Preview */}
+              {/* Center: Live Website Preview (iframe + selection bridge) */}
               <PreviewPane
                 selectedId={selected?.componentId ?? null}
                 onSelect={handleSelectComponent}
                 website={currentWebsite}
                 activeChange={activeChange}
-                isDomMutated={isDomMutated}
-                onToggleDomMutation={toggleDomMutation}
               />
 
               {/* Right: Inspector */}

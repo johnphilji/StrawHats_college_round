@@ -38,5 +38,9 @@ export interface CreatePatchData {
 
 export type PatchTransition =
   | { from: 'DRAFT'; to: 'GENERATING' | 'CANCELLED' }
-  | { from: 'GENERATED'; to: 'VALIDATING' }
-  | { from: 'READY_FOR_REVIEW'; to: 'APPROVED' | 'REJECTED'; reviewComment?: string };
+  | { from: 'GENERATING'; to: 'GENERATED' | 'FAILED' | 'CANCELLED' }
+  | { from: 'GENERATED'; to: 'VALIDATING' | 'CANCELLED' }
+  | { from: 'VALIDATING'; to: 'READY_FOR_REVIEW' | 'VALIDATION_FAILED' | 'FAILED' | 'CANCELLED' }
+  | { from: 'VALIDATION_FAILED'; to: 'VALIDATING' | 'CANCELLED' }
+  | { from: 'READY_FOR_REVIEW'; to: 'APPROVED' | 'REJECTED'; reviewComment?: string }
+  | { from: 'APPROVED'; to: 'MERGED' | 'FAILED' };

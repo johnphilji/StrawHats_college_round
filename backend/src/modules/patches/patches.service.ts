@@ -4,14 +4,22 @@ import { patchesRepository } from './patches.repository';
 import type { CreatePatchData, PatchRecord, PatchStatus } from './patches.types';
 
 const PatchStatus = {
-  GENERATING: 'GENERATING', CANCELLED: 'CANCELLED', VALIDATING: 'VALIDATING',
-  APPROVED: 'APPROVED', REJECTED: 'REJECTED',
+  GENERATING: 'GENERATING', GENERATED: 'GENERATED', VALIDATING: 'VALIDATING',
+  VALIDATION_FAILED: 'VALIDATION_FAILED', READY_FOR_REVIEW: 'READY_FOR_REVIEW',
+  APPROVED: 'APPROVED', REJECTED: 'REJECTED', MERGED: 'MERGED',
+  FAILED: 'FAILED', CANCELLED: 'CANCELLED',
 } as const;
 
+// Forward-only lifecycle. Every schema-allowed status is reachable from DRAFT;
+// terminal states (MERGED, FAILED, CANCELLED, REJECTED) have no outgoing edges.
 const transitions: Partial<Record<PatchStatus, PatchStatus[]>> = {
   DRAFT: [PatchStatus.GENERATING, PatchStatus.CANCELLED],
-  GENERATED: [PatchStatus.VALIDATING],
+  GENERATING: [PatchStatus.GENERATED, PatchStatus.FAILED, PatchStatus.CANCELLED],
+  GENERATED: [PatchStatus.VALIDATING, PatchStatus.CANCELLED],
+  VALIDATING: [PatchStatus.READY_FOR_REVIEW, PatchStatus.VALIDATION_FAILED, PatchStatus.FAILED, PatchStatus.CANCELLED],
+  VALIDATION_FAILED: [PatchStatus.VALIDATING, PatchStatus.CANCELLED],
   READY_FOR_REVIEW: [PatchStatus.APPROVED, PatchStatus.REJECTED],
+  APPROVED: [PatchStatus.MERGED, PatchStatus.FAILED],
 };
 
 function ensureDatabase() {

@@ -11,6 +11,12 @@ export interface ComponentRegistryEntry {
   allowedOperations?: string[];
   description?: string;
   framework?: ComponentFramework;
+  /** Page/route on which the element appears (single-page site: always "/"). */
+  route?: string;
+  /** Data object/array that owns the rendered value, when content is data-driven. */
+  dataSource?: string;
+  /** Editing constraints (e.g. preserve anchor targets, form wiring). */
+  notes?: string;
 }
 
 export type ComponentRegistry = Record<string, ComponentRegistryEntry>;
@@ -40,6 +46,9 @@ export interface ResolvedComponentContext {
   allowedOperations?: string[];
   description?: string;
   framework?: ComponentFramework;
+  route?: string;
+  dataSource?: string;
+  notes?: string;
 }
 
 /**

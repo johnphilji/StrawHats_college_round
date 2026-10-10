@@ -24,6 +24,9 @@ const envSchema = z.object({
   SUPABASE_SERVICE_ROLE_KEY: optionalStringSchema,
   LOG_LEVEL: z.enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace', 'silent']).default('info'),
   TARGET_REPOSITORY_PATH: optionalStringSchema,
+  // Patch provider for the local edit pipeline. Only 'mock' is implemented;
+  // unknown names fail fast instead of silently falling back.
+  LLM_PROVIDER: z.string().default('mock'),
 });
 
 export type Env = z.infer<typeof envSchema>;

@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import styles from './Inspector.module.css';
 import type { SelectedComponent, CodeChange } from './types';
-import { generateCodeChange, delay } from './api';
+import { delay } from './api';
+import { requestEditProposal, type EditProposal } from './api-client';
 
 interface InspectorProps {
   selected: SelectedComponent | null;
@@ -24,6 +25,7 @@ export default function Inspector({
   const [isGenerating, setIsGenerating] = useState(false);
   const [isDeploying, setIsDeploying] = useState(false);
   const [showFingerprint, setShowFingerprint] = useState(false);
+  const [requestError, setRequestError] = useState<string | null>(null);
 
   if (!selected) {
     return (
@@ -45,14 +47,39 @@ export default function Inspector({
   }
 
   const handleGenerate = async () => {
-    if (!instruction.trim()) return;
+    if (!instruction.trim() || !selected) return;
     setIsGenerating(true);
+    setRequestError(null);
 
-    await delay(1200);
-
-    const change = generateCodeChange(selected, instruction);
-    onChangeUpdate(change);
-    setIsGenerating(false);
+    try {
+      // Real backend request: resolve → source → (simulated) generate → validate.
+      const proposal: EditProposal = await requestEditProposal(selected.componentId, instruction);
+      const change: CodeChange = {
+        editId: `edit_${Date.now()}`,
+        componentId: proposal.componentId,
+        componentLabel: selected.label,
+        instruction,
+        branch: 'local/preview (uncommitted)',
+        commitSha: 'uncommitted',
+        status: 'review_diff',
+        diff: proposal.diff,
+        modifiedFiles: proposal.changedFiles,
+        explanation: proposal.summary,
+        provider: proposal.provider,
+        simulated: proposal.simulated,
+        validationErrors: proposal.validation.errors,
+        validationWarnings: [...proposal.validation.warnings, ...proposal.providerWarnings],
+        targetUnchanged: proposal.targetUnchanged,
+        isolatedPreviewApplied: proposal.isolatedPreviewApplied,
+        previewApplied: {},
+      };
+      onChangeUpdate(change);
+    } catch (err) {
+      // Preserve the selected component and prompt so the user can retry.
+      setRequestError(err instanceof Error ? err.message : 'Patch generation failed.');
+    } finally {
+      setIsGenerating(false);
+    }
   };
 
   const handleApproveBranch = () => {
@@ -205,10 +232,18 @@ export default function Inspector({
             <button
               className={styles.generateBtn}
               onClick={handleGenerate}
-              disabled={!instruction.trim()}
+              disabled={!instruction.trim() || isGenerating}
             >
-              Generate Patch
+              {isGenerating ? 'Generating…' : 'Generate Patch'}
             </button>
+
+            {requestError && (
+              <div className={styles.errorAlert} role="alert">
+                <strong>Patch generation failed.</strong>
+                <div>{requestError}</div>
+                <div className={styles.errorHint}>Your selection and prompt are preserved — fix the issue and retry.</div>
+              </div>
+            )}
           </div>
         )}
 
@@ -248,9 +283,31 @@ export default function Inspector({
 
             <p className={styles.explanationText}>{activeChange.explanation}</p>
 
+            {activeChange.simulated && (
+              <div className={styles.simulatedBadge}>
+                SIMULATED PATCH — generated locally by the mock provider, not a real LLM. Safe to review; the
+                repository is unchanged.
+              </div>
+            )}
+            {activeChange.validationWarnings.length > 0 && (
+              <div className={styles.validationList}>
+                {activeChange.validationWarnings.map((w, i) => (
+                  <div key={i}>Note: {w}</div>
+                ))}
+              </div>
+            )}
+            {activeChange.validationErrors.length > 0 && (
+              <div className={styles.errorAlert} role="alert">
+                <strong>Validation failed — do not apply.</strong>
+                {activeChange.validationErrors.map((e, i) => (
+                  <div key={i}>{e}</div>
+                ))}
+              </div>
+            )}
             <div className={styles.metaRow}>
-              <span>Branch: <code>{activeChange.branch}</code></span>
-              <span>Commit: <code>{activeChange.commitSha}</code></span>
+              <span>Target: <code>{activeChange.modifiedFiles.join(', ') || '—'}</code></span>
+              <span>Isolated preview: <code>{activeChange.isolatedPreviewApplied ? 'applied to temp copy' : 'not applied'}</code></span>
+              <span>Repository: <code>{activeChange.targetUnchanged ? 'unchanged' : 'CHECK REQUIRED'}</code></span>
             </div>
 
             {/* Fenced Diff Viewer */}
@@ -295,7 +352,7 @@ export default function Inspector({
                 </svg>
               </div>
               <div>
-                <strong>Change applied to branch:</strong>
+                <strong>Proposal ready for review:</strong>
                 <div className={styles.branchName}>
                   <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                     <line x1="6" y1="3" x2="6" y2="15" />
@@ -309,8 +366,8 @@ export default function Inspector({
             </div>
 
             <p className={styles.previewNotice}>
-              The interactive website preview is now rendering the updated branch code.
-              Inspect the updated element to verify visual output before merging.
+              The proposal was validated against an isolated temp copy of the source file.
+              The live website and the repository are unchanged until an explicit apply step.
             </p>
 
             <div className={styles.releaseActions}>

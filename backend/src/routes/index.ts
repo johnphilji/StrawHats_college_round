@@ -2,6 +2,7 @@ import { Router } from 'express';
 import healthRoutes from './health.routes';
 import projectsRoutes from '../modules/projects/projects.routes';
 import patchesRoutes from '../modules/patches/patches.routes';
+import editsRoutes from '../modules/edits/edits.routes';
 
 import componentRoutes from './component.routes';
 
@@ -11,10 +12,11 @@ router.use('/health', healthRoutes);
 router.use(patchesRoutes);
 router.use('/projects', projectsRoutes);
 router.use('/components', componentRoutes);
+router.use('/edits', editsRoutes);
 
 // Future mounts:
-// router.use('/edits', editsRoutes);
-// router.use('/patches', patchesRoutes);
+// router.use('/releases', releasesRoutes);
+// router.use('/deployments', deploymentsRoutes);
 // ...
 
 export default router;
