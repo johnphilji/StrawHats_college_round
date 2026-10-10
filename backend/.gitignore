@@ -1,10 +1,28 @@
-node_modules
-dist
-generated
+# Dependencies
+node_modules/
+
+# Environment variables and secrets
 .env
-.env.local
+.env.*
+!.env.example
+
+# Generated Prisma Client
+generated/
+
+# Temporary database test scripts
+test-db.ts
+check-db.ts
+
+# Logs
 *.log
+npm-debug.log*
+
+# Build output
+dist/
+
+# Coverage
+coverage/
+
+# OS/editor files
 .DS_Store
-coverage
-prisma/migrations
-!prisma/migrations/.gitkeep
+.vscode/

@@ -1,5 +1,11 @@
-// Prisma schema for PATCHWORK – minimal foundation
-// Learn more: https://pris.ly/d/prisma-schema
+// ============================================================
+// PATCHWORK — Prisma Schema
+// Prisma ORM 7
+//
+// GitHub: Source code, branches, commits, and diffs
+// Supabase: Application data and workflow metadata
+// Vercel: Preview and production deployments
+// ============================================================
 
 generator client {
   provider = "prisma-client"
@@ -10,22 +16,277 @@ datasource db {
   provider = "postgresql"
 }
 
-// Owner identity is derived from Supabase Auth JWT (auth.users).
-// We store ownerId as String (Supabase user UUID) without a FK to auth.users
-// because Supabase manages its own auth schema and cross-schema FKs require special setup.
-// If you provision Supabase with linked DB, you may add a FK constraint later.
+// ============================================================
+// ENUMS
+// ============================================================
+
+enum PatchStatus {
+  DRAFT
+  GENERATING
+  GENERATED
+  VALIDATING
+  VALIDATION_FAILED
+  READY_FOR_REVIEW
+  APPROVED
+  REJECTED
+  MERGED
+  FAILED
+  CANCELLED
+}
+
+enum ReleaseStatus {
+  PENDING
+  MERGING
+  MERGED
+  FAILED
+  REVERTED
+}
+
+enum DeploymentStatus {
+  QUEUED
+  BUILDING
+  READY
+  FAILED
+  CANCELLED
+}
+
+enum DeploymentEnvironment {
+  PREVIEW
+  PRODUCTION
+}
+
+enum AuditAction {
+  PROJECT_CREATED
+  PROJECT_UPDATED
+  PROJECT_DELETED
+
+  PATCH_CREATED
+  PATCH_GENERATION_STARTED
+  PATCH_GENERATED
+  PATCH_VALIDATION_STARTED
+  PATCH_VALIDATED
+  PATCH_VALIDATION_FAILED
+  PATCH_APPROVED
+  PATCH_REJECTED
+  PATCH_MERGED
+  PATCH_CANCELLED
+
+  RELEASE_CREATED
+  RELEASE_MERGED
+  RELEASE_FAILED
+  RELEASE_REVERTED
+
+  DEPLOYMENT_STARTED
+  DEPLOYMENT_SUCCEEDED
+  DEPLOYMENT_FAILED
+  DEPLOYMENT_CANCELLED
+
+  ROLLBACK_STARTED
+  ROLLBACK_SUCCEEDED
+  ROLLBACK_FAILED
+}
+
+// ============================================================
+// PROJECT
+// ============================================================
 
 model Project {
   id                   String   @id @default(cuid())
   name                 String
+  description          String?
+
   repositoryUrl        String?  @map("repository_url")
   repositoryIdentifier String?  @map("repository_identifier")
   productionBranch     String   @default("main") @map("production_branch")
+
+  // Supabase Auth user UUID; not a foreign key to auth.users.
   ownerId              String   @map("owner_id")
 
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
+  vercelProjectId      String?  @map("vercel_project_id")
+
+  createdAt            DateTime @default(now()) @map("created_at")
+  updatedAt            DateTime @updatedAt @map("updated_at")
+
+  patches              Patch[]
+  releases             Release[]
+  deployments          Deployment[]
+  auditLogs            AuditLog[]
 
   @@index([ownerId])
+  @@index([repositoryIdentifier])
   @@map("projects")
+}
+
+// ============================================================
+// PATCH
+// Tracks AI-generated code changes.
+// ============================================================
+
+model Patch {
+  id                String      @id @default(cuid())
+  projectId         String      @map("project_id")
+
+  prompt            String
+  summary           String?
+  status            PatchStatus @default(DRAFT)
+
+  // GitHub branch and commit information.
+  branchName        String?     @map("branch_name")
+  baseCommitSha     String?     @map("base_commit_sha")
+  headCommitSha     String?     @map("head_commit_sha")
+
+  // Optional GitHub pull request information.
+  pullRequestNumber Int?        @map("pull_request_number")
+  pullRequestUrl    String?     @map("pull_request_url")
+
+  // Change statistics.
+  filesChanged      Int         @default(0) @map("files_changed")
+  additions         Int         @default(0)
+  deletions         Int         @default(0)
+
+  // Validation results.
+  validationPassed  Boolean?    @map("validation_passed")
+  validationDetails Json?       @map("validation_details")
+
+  // Review information.
+  createdBy         String      @map("created_by")
+  reviewedBy        String?     @map("reviewed_by")
+  reviewedAt        DateTime?   @map("reviewed_at")
+  reviewComment     String?     @map("review_comment")
+
+  createdAt         DateTime    @default(now()) @map("created_at")
+  updatedAt         DateTime    @updatedAt @map("updated_at")
+
+  project           Project     @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  releases          Release[]
+  auditLogs         AuditLog[]
+
+  @@index([projectId])
+  @@index([status])
+  @@index([createdBy])
+  @@index([projectId, createdAt])
+  @@map("patches")
+}
+
+// ============================================================
+// RELEASE
+// Tracks the merge and release lifecycle.
+// ============================================================
+
+model Release {
+  id                String        @id @default(cuid())
+  projectId         String        @map("project_id")
+  patchId           String?       @map("patch_id")
+
+  status            ReleaseStatus @default(PENDING)
+
+  sourceBranch      String?       @map("source_branch")
+  targetBranch      String        @default("main") @map("target_branch")
+  commitSha         String?       @map("commit_sha")
+
+  mergedBy          String?       @map("merged_by")
+  mergedAt          DateTime?     @map("merged_at")
+
+  version           String?
+  notes             String?
+
+  // Link to the preceding known-good release.
+  previousReleaseId String?       @map("previous_release_id")
+
+  previousRelease   Release?      @relation("ReleaseHistory", fields: [previousReleaseId], references: [id], onDelete: SetNull)
+  subsequentReleases Release[]    @relation("ReleaseHistory")
+
+  createdAt         DateTime      @default(now()) @map("created_at")
+  updatedAt         DateTime      @updatedAt @map("updated_at")
+
+  project           Project       @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  patch             Patch?        @relation(fields: [patchId], references: [id], onDelete: SetNull)
+
+  deployments       Deployment[]
+  auditLogs         AuditLog[]
+
+  @@index([projectId])
+  @@index([patchId])
+  @@index([status])
+  @@index([projectId, createdAt])
+  @@map("releases")
+}
+
+// ============================================================
+// DEPLOYMENT
+// Tracks Vercel preview and production deployments.
+// ============================================================
+
+model Deployment {
+  id                 String                @id @default(cuid())
+  projectId          String                @map("project_id")
+  releaseId          String?               @map("release_id")
+
+  environment        DeploymentEnvironment
+  status             DeploymentStatus      @default(QUEUED)
+
+  vercelDeploymentId String?               @unique @map("vercel_deployment_id")
+
+  deploymentUrl      String?               @map("deployment_url")
+  aliasUrl           String?               @map("alias_url")
+
+  commitSha           String?               @map("commit_sha")
+  branchName          String?               @map("branch_name")
+
+  errorMessage        String?               @map("error_message")
+
+  startedAt           DateTime?             @map("started_at")
+  completedAt         DateTime?             @map("completed_at")
+
+  createdAt           DateTime              @default(now()) @map("created_at")
+  updatedAt           DateTime              @updatedAt @map("updated_at")
+
+  project             Project               @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  release             Release?              @relation(fields: [releaseId], references: [id], onDelete: SetNull)
+
+  auditLogs           AuditLog[]
+
+  @@index([projectId])
+  @@index([releaseId])
+  @@index([status])
+  @@index([environment])
+  @@index([projectId, createdAt])
+  @@map("deployments")
+}
+
+// ============================================================
+// AUDIT LOG
+// Records important actions in the workflow.
+// ============================================================
+
+model AuditLog {
+  id           String      @id @default(cuid())
+
+  projectId    String      @map("project_id")
+  patchId      String?     @map("patch_id")
+  releaseId    String?     @map("release_id")
+  deploymentId String?     @map("deployment_id")
+
+  actorId      String?     @map("actor_id")
+
+  action       AuditAction
+  message      String?
+  metadata     Json?
+
+  requestId    String?     @map("request_id")
+
+  createdAt    DateTime    @default(now()) @map("created_at")
+
+  project      Project     @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  patch        Patch?      @relation(fields: [patchId], references: [id], onDelete: SetNull)
+  release      Release?    @relation(fields: [releaseId], references: [id], onDelete: SetNull)
+  deployment   Deployment? @relation(fields: [deploymentId], references: [id], onDelete: SetNull)
+
+  @@index([projectId, createdAt])
+  @@index([patchId])
+  @@index([releaseId])
+  @@index([deploymentId])
+  @@index([actorId])
+  @@index([action])
+  @@map("audit_logs")
 }
