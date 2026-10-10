@@ -1,0 +1,13 @@
+{
+  "sites": [
+    {
+      "id": "acme",
+      "name": "Acme Store",
+      "targetUrl": "http://localhost:4000"
+    }
+  ],
+  "patches": [],
+  "releases": [],
+  "telemetry": [],
+  "audit": []
+}
