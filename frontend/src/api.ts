@@ -12,8 +12,8 @@ import type {
 export const MOCK_WEBSITES: ConnectedWebsite[] = [
   {
     id: 'acme-store',
-    name: 'Acme Pet Store',
-    tagline: 'Modern pet supplies & accessories e-commerce storefront',
+    name: 'Acme Supply Store',
+    tagline: 'Modern pet supplies & accessories storefront',
     repoUrl: 'https://github.com/johnphilji/demo-sites.git',
     repoOwner: 'johnphilji',
     repoName: 'demo-sites',
@@ -27,15 +27,15 @@ export const MOCK_WEBSITES: ConnectedWebsite[] = [
     lastModified: 'Just now',
     componentCount: 14,
     category: 'Ecommerce',
-    icon: '🐾',
-    framework: 'Vanilla HTML5 / CSS3',
+    code: 'AC',
+    framework: 'HTML5 / CSS3',
     activeRelease: 'v1.2.0',
     activePatchesCount: 3,
   },
   {
     id: 'nova-saas',
-    name: 'Nova AI Platform',
-    tagline: 'High-converting B2B SaaS landing page & pricing matrix',
+    name: 'Nova Platform',
+    tagline: 'B2B developer SaaS landing and pricing matrix',
     repoUrl: 'https://github.com/johnphilji/nova-saas-landing.git',
     repoOwner: 'johnphilji',
     repoName: 'nova-saas-landing',
@@ -48,15 +48,15 @@ export const MOCK_WEBSITES: ConnectedWebsite[] = [
     lastModified: '2 hours ago',
     componentCount: 22,
     category: 'SaaS',
-    icon: '⚡',
-    framework: 'React / Vite / Tailwind',
+    code: 'NV',
+    framework: 'React / Vite',
     activeRelease: 'v2.0.4',
     activePatchesCount: 2,
   },
   {
     id: 'pulse-docs',
     name: 'Pulse Developer Docs',
-    tagline: 'Interactive API documentation & developer tutorials portal',
+    tagline: 'Interactive API documentation and developer tutorials',
     repoUrl: 'https://github.com/strawhats/pulse-docs.git',
     repoOwner: 'strawhats',
     repoName: 'pulse-docs',
@@ -69,8 +69,8 @@ export const MOCK_WEBSITES: ConnectedWebsite[] = [
     lastModified: 'Yesterday',
     componentCount: 18,
     category: 'Docs',
-    icon: '📖',
-    framework: 'Docusaurus / MDX',
+    code: 'PL',
+    framework: 'Docusaurus',
     activeRelease: 'v1.0.0',
     activePatchesCount: 1,
   },
@@ -79,7 +79,7 @@ export const MOCK_WEBSITES: ConnectedWebsite[] = [
 export const MOCK_COMPONENTS: SelectedComponent[] = [
   {
     componentId: 'hero-cta',
-    label: 'Buy Now Button',
+    label: 'Primary Call to Action Button',
     tagName: 'BUTTON',
     text: 'Buy Now — $34.99',
     sourceFile: 'index.html:L54 & styles.css:L132',
@@ -115,7 +115,7 @@ export const MOCK_COMPONENTS: SelectedComponent[] = [
   },
   {
     componentId: 'hero-title',
-    label: 'Storefront Hero Heading',
+    label: 'Hero Section Heading',
     tagName: 'H1',
     text: 'Premium Care for Happy Companions',
     sourceFile: 'index.html:L42 & styles.css:L98',
@@ -151,7 +151,7 @@ export const MOCK_COMPONENTS: SelectedComponent[] = [
   },
   {
     componentId: 'checkout-button',
-    label: 'Proceed to Checkout Button',
+    label: 'Cart Checkout Button',
     tagName: 'BUTTON',
     text: 'Proceed to Checkout',
     sourceFile: 'index.html:L112 & styles.css:L285',
@@ -187,7 +187,7 @@ export const MOCK_COMPONENTS: SelectedComponent[] = [
   },
   {
     componentId: 'product-price',
-    label: 'Featured Price Tag',
+    label: 'Product Price Badge',
     tagName: 'SPAN',
     text: '$34.99',
     sourceFile: 'index.html:L78 & styles.css:L160',
@@ -223,15 +223,15 @@ export const MOCK_COMPONENTS: SelectedComponent[] = [
   },
   {
     componentId: 'nav-announcement',
-    label: 'Top Announcement Banner',
+    label: 'Header Notification Bar',
     tagName: 'DIV',
-    text: '🐾 Flash Sale: 20% off all organic treats with code PATCHWORK',
+    text: 'Seasonal Promotion: 20% off all catalog orders with code PATCHWORK',
     sourceFile: 'index.html:L15 & styles.css:L35',
     lineRange: 'index.html (15-18)',
     fingerprint: {
       tag: 'DIV',
       selector: '.announcement-bar',
-      text: '🐾 Flash Sale: 20% off all organic treats with code PATCHWORK',
+      text: 'Seasonal Promotion: 20% off all catalog orders with code PATCHWORK',
       attributes: { class: 'announcement-bar' },
       parentTag: 'HEADER',
       parentSelector: 'header.site-header',
@@ -247,8 +247,8 @@ export const MOCK_COMPONENTS: SelectedComponent[] = [
     },
     styles: {
       color: '#ffffff',
-      backgroundColor: '#4338ca',
-      fontSize: '12.5px',
+      backgroundColor: '#1e293b',
+      fontSize: '12px',
       fontWeight: '500',
       padding: '8px 16px',
       margin: '0',
@@ -265,18 +265,18 @@ export const INITIAL_CONFLICTS: PatchConflict[] = [
     targetFingerprint: '#checkout-button',
     elementLabel: 'Checkout Button',
     property: 'backgroundColor',
-    originalBaseline: '#16a34a (Original Green)',
+    originalBaseline: '#16a34a',
     status: 'unresolved',
     patchA: {
       patchId: 'patch-001',
-      author: 'Alex Rivera (Frontend Lead)',
+      author: 'Alex Rivera',
       value: '#2563eb (Royal Blue)',
       timestamp: '15 mins ago',
     },
     patchB: {
       patchId: 'patch-004',
-      author: 'Marcus Vance (CRO Specialist)',
-      value: '#ef4444 (Crimson Red)',
+      author: 'Marcus Vance',
+      value: '#ef4444 (Crimson)',
       timestamp: '5 mins ago',
     },
   },
@@ -292,9 +292,9 @@ export const INITIAL_TEST_RUNS: PlaywrightTestRun[] = [
     mismatchPercentage: 0.8,
     checks: [
       { id: 'c1', name: 'Element Reachability & Visibility', status: 'pass', message: 'Target element #checkout-button visible in viewport', durationMs: 140 },
-      { id: 'c2', name: 'Interaction & Synthetic Click', status: 'pass', message: 'Triggered simulated user click; intercepted route without crash', durationMs: 220 },
-      { id: 'c3', name: 'Content Security & CSP Guard', status: 'pass', message: 'No unauthorized eval or CSP violations detected', durationMs: 90 },
-      { id: 'c4', name: 'Visual Regression (Pixel Diff)', status: 'pass', message: 'Mismatch: 0.8% (Target component modified as expected)', durationMs: 290 },
+      { id: 'c2', name: 'Synthetic Click & Event Assertion', status: 'pass', message: 'Intercepted click route without runtime errors', durationMs: 220 },
+      { id: 'c3', name: 'Content Security & CSP Check', status: 'pass', message: 'No unauthorized scripts or CSP violations detected', durationMs: 90 },
+      { id: 'c4', name: 'Visual Regression (Pixel Diff)', status: 'pass', message: 'Mismatch: 0.8% (Strict threshold < 2.0% passed)', durationMs: 290 },
     ],
   },
   {
@@ -306,9 +306,9 @@ export const INITIAL_TEST_RUNS: PlaywrightTestRun[] = [
     mismatchPercentage: 4.2,
     checks: [
       { id: 'c1', name: 'Element Reachability & Visibility', status: 'pass', message: 'Target element visible', durationMs: 110 },
-      { id: 'c2', name: 'Conflict Engine Validation', status: 'fail', message: 'CONCURRENT MODIFICATION: Overlaps active Patch on backgroundColor', durationMs: 75 },
+      { id: 'c2', name: 'Conflict Engine Validation', status: 'fail', message: 'Concurrent modification: overlaps active patch on backgroundColor', durationMs: 75 },
       { id: 'c3', name: 'Interaction & Synthetic Click', status: 'pass', message: 'Synthetic event test passed', durationMs: 210 },
-      { id: 'c4', name: 'Pre-flight Release Gate', status: 'fail', message: 'Deployment BLOCKED until conflict is resolved by maintainer', durationMs: 425 },
+      { id: 'c4', name: 'Pre-flight Release Gate', status: 'fail', message: 'Deployment blocked until conflict is resolved', durationMs: 425 },
     ],
   },
 ];
@@ -350,7 +350,7 @@ export const INITIAL_AUDIT_LOGS: AuditLog[] = [
   {
     id: 'log-01',
     timestamp: '12 mins ago',
-    user: { name: 'Alex Rivera', avatar: '👨‍💻' },
+    user: { name: 'Alex Rivera', initials: 'AR' },
     action: 'DEPLOY_RELEASE',
     category: 'deploy',
     target: 'Release v1.2.0',
@@ -359,20 +359,20 @@ export const INITIAL_AUDIT_LOGS: AuditLog[] = [
   {
     id: 'log-02',
     timestamp: '14 mins ago',
-    user: { name: 'Alex Rivera', avatar: '👨‍💻' },
+    user: { name: 'Alex Rivera', initials: 'AR' },
     action: 'TEST_PASSED',
     category: 'test',
     target: 'Patch #checkout-button',
-    details: 'Playwright automated test suite passed with 0.8% visual difference gate.',
+    details: 'Automated headless test suite passed with 0.8% visual difference gate.',
   },
   {
     id: 'log-03',
     timestamp: '18 mins ago',
-    user: { name: 'Marcus Vance', avatar: '🧑‍🎨' },
+    user: { name: 'Marcus Vance', initials: 'MV' },
     action: 'CONFLICT_FLAGGED',
     category: 'conflict',
     target: '#checkout-button (backgroundColor)',
-    details: 'Automated conflict detector caught concurrent backgroundColor edit.',
+    details: 'Conflict detector flagged concurrent backgroundColor edit.',
   },
 ];
 
@@ -380,22 +380,22 @@ export const INITIAL_HISTORY: HistoryItem[] = [
   {
     id: 'hist-1',
     componentLabel: 'Buy Now Button',
-    instruction: 'Make button emerald green and change copy to "Get Started ➔"',
+    instruction: 'Set button to primary green and change text to "Get Started"',
     branch: 'patchwork/edit-hero-cta-7e3a',
     commitSha: 'b54911e',
     timestamp: '25 mins ago',
     status: 'deployed',
-    author: 'AI Agent (PATCHWORK)',
+    author: 'Developer',
   },
   {
     id: 'hist-2',
-    componentLabel: 'Top Announcement Banner',
-    instruction: 'Update promo text with 20% off discount banner',
+    componentLabel: 'Header Notification Bar',
+    instruction: 'Update promo text with seasonal discount details',
     branch: 'patchwork/edit-promo-821f',
     commitSha: 'a19bc32',
     timestamp: '2 hours ago',
     status: 'deployed',
-    author: 'AI Agent (PATCHWORK)',
+    author: 'Developer',
   },
 ];
 
@@ -417,9 +417,9 @@ export function generateCodeChange(
 
   if (lower.includes('green') || lower.includes('emerald') || lower.includes('get started')) {
     modifiedFiles = ['styles.css', 'index.html'];
-    explanation = 'Changed button background to emerald green (#10b981) and updated text to "Get Started ➔".';
+    explanation = 'Updated button background to #10b981 and set label to "Get Started".';
     previewApplied.backgroundColor = '#10b981';
-    previewApplied.text = 'Get Started ➔';
+    previewApplied.text = 'Get Started';
     previewApplied.borderRadius = '9999px';
 
     diff = `--- a/Ecommerce/styles.css
@@ -437,18 +437,18 @@ export function generateCodeChange(
 +++ b/Ecommerce/index.html
 @@ -54,3 +54,3 @@
 -  <button class="btn-primary" id="hero-cta">Buy Now — $34.99</button>
-+  <button class="btn-primary" id="hero-cta">Get Started ➔</button>`;
++  <button class="btn-primary" id="hero-cta">Get Started</button>`;
   } else if (lower.includes('blue') || lower.includes('payment') || lower.includes('checkout')) {
     modifiedFiles = ['styles.css', 'index.html'];
-    explanation = 'Updated button to royal blue (#2563eb) and set label to "Continue to Payment 🔒".';
+    explanation = 'Updated button to royal blue (#2563eb) and set label to "Continue to Payment".';
     previewApplied.backgroundColor = '#2563eb';
-    previewApplied.text = 'Continue to Payment 🔒';
+    previewApplied.text = 'Continue to Payment';
 
     diff = `--- a/Ecommerce/index.html
 +++ b/Ecommerce/index.html
 @@ -112,3 +112,3 @@
 -  <button class="btn-checkout" id="checkout-button">Proceed to Checkout</button>
-+  <button class="btn-checkout" id="checkout-button">Continue to Payment 🔒</button>
++  <button class="btn-checkout" id="checkout-button">Continue to Payment</button>
 
 --- a/Ecommerce/styles.css
 +++ b/Ecommerce/styles.css
@@ -460,7 +460,7 @@ export function generateCodeChange(
  }`;
   } else {
     explanation = `Applied requested visual style update to ${component.label}.`;
-    previewApplied.backgroundColor = '#7c3aed';
+    previewApplied.backgroundColor = '#4f46e5';
     previewApplied.borderRadius = '8px';
 
     diff = `--- a/Ecommerce/styles.css
@@ -468,7 +468,7 @@ export function generateCodeChange(
 @@ -132,3 +132,4 @@
  .${component.componentId} {
 -  /* original styles */
-+  background-color: #7c3aed;
++  background-color: #4f46e5;
 +  transition: all 0.2s ease-in-out;
  }`;
   }

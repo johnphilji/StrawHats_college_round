@@ -1,4 +1,4 @@
-// PATCHWORK Complete Type Definitions
+// PATCHWORK Type Definitions
 
 export interface ConnectedWebsite {
   id: string;
@@ -17,7 +17,7 @@ export interface ConnectedWebsite {
   lastModified: string;
   componentCount: number;
   category: 'Ecommerce' | 'SaaS' | 'Docs';
-  icon: string;
+  code: string;
   framework: string;
   activeRelease: string;
   activePatchesCount: number;
@@ -155,7 +155,7 @@ export interface AuditLog {
   timestamp: string;
   user: {
     name: string;
-    avatar: string;
+    initials: string;
   };
   action: string;
   category: 'patch' | 'conflict' | 'test' | 'deploy' | 'rollback';

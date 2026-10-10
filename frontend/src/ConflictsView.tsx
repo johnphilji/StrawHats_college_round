@@ -21,7 +21,7 @@ export default function ConflictsView({ onResolveConflict }: ConflictsViewProps)
             ? c.patchA.value
             : choice === 'patchB'
             ? c.patchB.value
-            : '#2563eb (Royal Blue) + "Continue to Payment 🔒"',
+            : '#2563eb (Royal Blue) + "Continue to Payment"',
       }))
     );
     if (onResolveConflict) {
@@ -47,7 +47,11 @@ export default function ConflictsView({ onResolveConflict }: ConflictsViewProps)
       <div className={styles.body}>
         {selectedConflict.status === 'resolved' ? (
           <div className={styles.resolvedCard}>
-            <div className={styles.resolvedIcon}>✓</div>
+            <div className={styles.resolvedIcon}>
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#16a34a" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <polyline points="20 6 9 17 4 12" />
+              </svg>
+            </div>
             <h3 className={styles.resolvedTitle}>Conflict Successfully Resolved</h3>
             <p className={styles.resolvedDesc}>
               Adopted value: <strong>{selectedConflict.resolvedValue}</strong>.
@@ -95,7 +99,7 @@ export default function ConflictsView({ onResolveConflict }: ConflictsViewProps)
                 </div>
                 <div className={styles.previewBox}>
                   <button className={styles.mockBtn} style={{ backgroundColor: '#2563eb' }}>
-                    Continue to Payment 🔒
+                    Continue to Payment
                   </button>
                 </div>
                 <button className={styles.acceptBtnA} onClick={() => handleResolve('patchA')}>
@@ -121,16 +125,16 @@ export default function ConflictsView({ onResolveConflict }: ConflictsViewProps)
               </div>
             </div>
 
-            {/* Smart Merge Banner */}
+            {/* Reconciliation Recommendation Banner */}
             <div className={styles.smartMergeBanner}>
               <div>
-                <div className={styles.smartMergeTitle}>✨ Smart Merge Suggestion</div>
+                <div className={styles.smartMergeTitle}>Reconciliation Recommendation</div>
                 <div className={styles.smartMergeDesc}>
                   Adopt Alex's royal blue styling (<code>#2563eb</code>) and payment copy while rejecting the crimson override.
                 </div>
               </div>
               <button className={styles.smartMergeBtn} onClick={() => handleResolve('smart_merge')}>
-                Apply Smart Merge ➔
+                Apply Recommended Resolution
               </button>
             </div>
           </>

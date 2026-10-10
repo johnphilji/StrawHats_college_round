@@ -33,7 +33,7 @@ export default function WebsitesView({ onSelectWebsite }: WebsitesViewProps) {
       lastModified: 'Just now',
       componentCount: 8,
       category: 'Ecommerce',
-      icon: '🛍️',
+      code: name.slice(0, 2).toUpperCase(),
       framework: 'HTML / CSS / JS',
       activeRelease: 'v1.0.0',
       activePatchesCount: 0,
@@ -66,13 +66,22 @@ export default function WebsitesView({ onSelectWebsite }: WebsitesViewProps) {
         {websites.map(site => (
           <div key={site.id} className={styles.card} onClick={() => onSelectWebsite(site)}>
             <div className={styles.cardTop}>
-              <div className={styles.iconBox}>{site.icon}</div>
+              <div className={styles.iconBox}>{site.code}</div>
               <div className={styles.infoBox}>
                 <h3 className={styles.siteName}>{site.name}</h3>
                 <div className={styles.repoPill}>
-                  <span>📦 {site.repoOwner}/{site.repoName}</span>
-                  <span style={{ color: '#94a3b8' }}>•</span>
-                  <span>⎇ {site.branch}</span>
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" />
+                  </svg>
+                  <span>{site.repoOwner}/{site.repoName}</span>
+                  <span className={styles.divider}>•</span>
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <line x1="6" y1="3" x2="6" y2="15" />
+                    <circle cx="18" cy="6" r="3" />
+                    <circle cx="6" cy="18" r="3" />
+                    <path d="M18 9a9 9 0 0 1-9 9" />
+                  </svg>
+                  <span>{site.branch}</span>
                 </div>
               </div>
             </div>
@@ -82,7 +91,7 @@ export default function WebsitesView({ onSelectWebsite }: WebsitesViewProps) {
             <div className={styles.cardFooter}>
               <span className={styles.previewUrl}>{site.previewUrl}</span>
               <button className={styles.openBtn}>
-                Open in Editor ➔
+                Open in Editor
               </button>
             </div>
           </div>
@@ -95,7 +104,12 @@ export default function WebsitesView({ onSelectWebsite }: WebsitesViewProps) {
           <div className={styles.modal} onClick={e => e.stopPropagation()}>
             <div className={styles.modalHeader}>
               <h3 className={styles.modalTitle}>Connect a Website Repository</h3>
-              <button className={styles.closeBtn} onClick={() => setShowModal(false)}>✕</button>
+              <button className={styles.closeBtn} onClick={() => setShowModal(false)} aria-label="Close">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  <line x1="18" y1="6" x2="6" y2="18" />
+                  <line x1="6" y1="6" x2="18" y2="18" />
+                </svg>
+              </button>
             </div>
 
             <form onSubmit={handleConnect} className={styles.form}>

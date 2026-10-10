@@ -72,15 +72,24 @@
 }
 
 .iconBox {
-  font-size: 24px;
-  background: var(--bg-base);
-  width: 44px;
-  height: 44px;
+  font-family: var(--font-mono);
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text-primary);
+  background: var(--bg-hover);
+  letter-spacing: 0.5px;
+  width: 40px;
+  height: 40px;
   display: flex;
   align-items: center;
   justify-content: center;
-  border-radius: var(--radius-md);
+  border-radius: var(--radius-sm);
   border: 1px solid var(--border-default);
+}
+
+.divider {
+  color: #94a3b8;
+  margin: 0 2px;
 }
 
 .infoBox {

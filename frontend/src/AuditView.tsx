@@ -19,7 +19,7 @@ export default function AuditView() {
           <div key={log.id} className={styles.logCard}>
             <div className={styles.logTop}>
               <div className={styles.userGroup}>
-                <span className={styles.avatar}>{log.user.avatar}</span>
+                <span className={styles.avatar}>{log.user.initials}</span>
                 <span className={styles.name}>{log.user.name}</span>
                 <span className={styles.actionBadge}>{log.action}</span>
               </div>

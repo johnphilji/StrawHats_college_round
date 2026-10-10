@@ -41,7 +41,19 @@ export default function TestingView() {
         </div>
 
         <button className={styles.runBtn} onClick={handleRun} disabled={isRunning}>
-          {isRunning ? '⏳ Running Playwright...' : '▶ Run Verification Suite'}
+          {isRunning ? (
+            <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <span className={styles.btnSpinner} />
+              Running Verification...
+            </span>
+          ) : (
+            <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor">
+                <polygon points="5 3 19 12 5 21 5 3" />
+              </svg>
+              Run Verification Suite
+            </span>
+          )}
         </button>
       </div>
 
@@ -49,7 +61,13 @@ export default function TestingView() {
         {/* Release Gate Card */}
         <div className={styles.gateCard}>
           <div>
-            <div className={styles.gateTitle}>PRE-FLIGHT RELEASE GATE: {activeRun.status === 'passed' ? '🟢 PASSED' : '🔴 BLOCKED'}</div>
+            <div className={styles.gateTitleRow}>
+              <span className={styles.gateTitle}>PRE-FLIGHT RELEASE GATE:</span>
+              <span className={activeRun.status === 'passed' ? styles.gatePassedBadge : styles.gateBlockedBadge}>
+                <span className={styles.statusDot} />
+                {activeRun.status === 'passed' ? 'PASSED' : 'BLOCKED'}
+              </span>
+            </div>
             <div className={styles.gateSub}>{activeRun.patchTitle} • Executed in {activeRun.durationMs}ms</div>
           </div>
           <span className={styles.mismatchBadge}>Pixel Shift: {activeRun.mismatchPercentage}%</span>
@@ -60,7 +78,16 @@ export default function TestingView() {
           {activeRun.checks.map(c => (
             <div key={c.id} className={styles.checkRow}>
               <span className={c.status === 'pass' ? styles.passIcon : styles.failIcon}>
-                {c.status === 'pass' ? '✓' : '✕'}
+                {c.status === 'pass' ? (
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.8" strokeLinecap="round" strokeLinejoin="round">
+                    <polyline points="20 6 9 17 4 12" />
+                  </svg>
+                ) : (
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.8" strokeLinecap="round" strokeLinejoin="round">
+                    <line x1="18" y1="6" x2="6" y2="18" />
+                    <line x1="6" y1="6" x2="18" y2="18" />
+                  </svg>
+                )}
               </span>
               <div className={styles.checkInfo}>
                 <div className={styles.checkNameRow}>
@@ -87,7 +114,7 @@ export default function TestingView() {
             <div className={styles.visualCard}>
               <div className={styles.visualLabel}>2. APPLIED CHANGE</div>
               <div className={styles.mockBox}>
-                <button className={styles.mockPatched}>Continue to Payment 🔒</button>
+                <button className={styles.mockPatched}>Continue to Payment</button>
               </div>
             </div>
 
