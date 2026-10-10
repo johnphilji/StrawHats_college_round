@@ -44,25 +44,27 @@ describe('Groq LLM integration', () => {
 
   it('generates a patch preview from Groq and returns a Git-safe branch name', async () => {
     process.env.GROQ_API_KEY = 'fake-key';
-    process.env.GROQ_MODEL = 'llama-3.1-8b-instant';
+    process.env.GROQ_MODEL = 'openai/gpt-oss-20b';
+
+    const groqPayload = {
+      choices: [
+        {
+          message: {
+            content: JSON.stringify({
+              diff: '--- a/src/components/CheckoutButton.tsx\n+++ b/src/components/CheckoutButton.tsx\n@@\n- Checkout\n+ Continue to Payment',
+              changedFiles: ['src/components/CheckoutButton.tsx'],
+              summary: 'Updated checkout CTA.',
+            }),
+          },
+        },
+      ],
+    };
 
     vi.stubGlobal(
       'fetch',
       vi.fn().mockResolvedValue({
         ok: true,
-        json: async () => ({
-          choices: [
-            {
-              message: {
-                content: JSON.stringify({
-                  diff: '--- a/src/components/CheckoutButton.tsx\n+++ b/src/components/CheckoutButton.tsx\n@@\n- Checkout\n+ Continue to Payment',
-                  changedFiles: ['src/components/CheckoutButton.tsx'],
-                  summary: 'Updated checkout CTA.',
-                }),
-              },
-            },
-          ],
-        }),
+        text: async () => JSON.stringify(groqPayload),
       })
     );
 
@@ -73,7 +75,7 @@ describe('Groq LLM integration', () => {
     });
 
     expect(result.status).toBe('success');
-    expect(result.branch).toMatch(/^patch\/checkout-button-/);
+    expect(result.branch).toMatch(/^patchwork\/checkout-button-/);
     expect(result.diff).toContain('Continue to Payment');
     expect(result.changedFiles).toEqual(['src/components/CheckoutButton.tsx']);
   });

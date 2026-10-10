@@ -1,6 +1,6 @@
 import { isPrismaConfigured } from '../../lib/prisma';
 import { AppError, conflict } from '../../shared/errors/AppError';
-import { workflowRepository } from './workflow.repository';
+import { workflowRepository, type GenerationProposal } from './workflow.repository';
 import type { GenerationCallback, ValidationCallback } from './workflow.schema';
 
 function ensureDatabase() {
@@ -8,6 +8,14 @@ function ensureDatabase() {
 }
 
 export const workflowService = {
+  async recordProposal(projectId: string, patchId: string, generationId: string, proposal: GenerationProposal) {
+    ensureDatabase();
+    if (!await workflowRepository.findPatch(projectId, patchId)) throw new AppError('Patch not found', { statusCode: 404, code: 'NOT_FOUND' });
+    const patch = await workflowRepository.saveGenerationProposal(projectId, patchId, generationId, proposal);
+    if (!patch) throw conflict('Generation proposal is stale or the patch is no longer awaiting generation.');
+    return patch;
+  },
+
   async recordGeneration(projectId: string, patchId: string, result: GenerationCallback) {
     ensureDatabase();
     if (!await workflowRepository.findPatch(projectId, patchId)) throw new AppError('Patch not found', { statusCode: 404, code: 'NOT_FOUND' });

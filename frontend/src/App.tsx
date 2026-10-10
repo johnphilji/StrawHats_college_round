@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import './App.css';
 import Sidebar from './Sidebar';
 import PreviewPane from './PreviewPane';
@@ -10,12 +10,42 @@ import WebsitesView from './WebsitesView';
 import AuditView from './AuditView';
 import { MOCK_WEBSITES } from './api';
 import type { SelectedComponent, ConnectedWebsite, CodeChange } from './types';
+import type { Session } from '@supabase/supabase-js';
+import { supabase } from './lib/supabase';
 
 export default function App() {
   const [activeView, setActiveView]         = useState<string>('editor');
   const [currentWebsite, setCurrentWebsite] = useState<ConnectedWebsite>(MOCK_WEBSITES[0]);
   const [selected, setSelected]             = useState<SelectedComponent | null>(null);
   const [activeChange, setActiveChange]     = useState<CodeChange | null>(null);
+  const [session, setSession] = useState<Session | null>(null);
+
+  useEffect(() => {
+    if (!supabase) return;
+    let active = true;
+    void supabase.auth.getSession().then(({ data }) => {
+      if (active) setSession(data.session);
+    });
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, nextSession) => {
+      setSession(nextSession);
+    });
+    return () => {
+      active = false;
+      subscription.unsubscribe();
+    };
+  }, []);
+
+  const handleSignIn = useCallback(() => {
+    if (!supabase) return;
+    void supabase.auth.signInWithOAuth({
+      provider: 'github',
+      options: { redirectTo: window.location.origin, scopes: 'read:user user:email' },
+    });
+  }, []);
+
+  const handleSignOut = useCallback(() => {
+    void supabase?.auth.signOut();
+  }, []);
 
   const handleSelectWebsite = useCallback((site: ConnectedWebsite) => {
     setCurrentWebsite(site);
@@ -33,10 +63,6 @@ export default function App() {
 
   const handleClearSelection = useCallback(() => {
     setSelected(null);
-  }, []);
-
-  const handleReleaseSuccess = useCallback((deployedChange: CodeChange) => {
-    void deployedChange;
   }, []);
 
   return (
@@ -88,6 +114,11 @@ export default function App() {
             <span className="badge-dot" />
             <span>Git Bridge Online</span>
           </div>
+          {supabase && (
+            <button className="site-dropdown" onClick={session ? handleSignOut : handleSignIn}>
+              {session ? 'Sign out' : 'Sign in with GitHub'}
+            </button>
+          )}
         </div>
       </header>
 
@@ -102,7 +133,11 @@ export default function App() {
 
         <main className="main-content">
           {activeView === 'websites' && (
-            <WebsitesView onSelectWebsite={handleSelectWebsite} />
+            <WebsitesView
+              onSelectWebsite={handleSelectWebsite}
+              isAuthenticated={Boolean(session)}
+              onSignIn={handleSignIn}
+            />
           )}
 
           {activeView === 'editor' && (
@@ -121,8 +156,10 @@ export default function App() {
                 onClear={handleClearSelection}
                 activeChange={activeChange}
                 onChangeUpdate={setActiveChange}
-                onReleaseSuccess={handleReleaseSuccess}
                 onOpenConflicts={() => setActiveView('conflicts')}
+                projectId={currentWebsite.projectId}
+                repositoryIdentifier={currentWebsite.repositoryIdentifier}
+                productionBranch={currentWebsite.branch}
               />
             </div>
           )}

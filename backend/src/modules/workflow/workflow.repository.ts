@@ -28,7 +28,28 @@ function sameGeneration(patch: any, result: GenerationCallback): boolean {
   const workflow = workflowDetails(patch.validationDetails);
   if (!workflow || workflow.generationId !== result.generationId || workflow.outcome !== (result.success ? 'SUCCEEDED' : 'FAILED')) return false;
   if (!result.success) return workflow.failureCategory === result.failureCategory && workflow.errorSummary === result.errorSummary;
-  return patch.branchName === result.branchName && patch.baseCommitSha === (result.baseCommitSha ?? null) && patch.headCommitSha === (result.headCommitSha ?? null) && patch.filesChanged === result.filesChanged && patch.additions === result.additions && patch.deletions === result.deletions && (patch.summary ?? '') === (result.summary ?? '');
+  return patch.branchName === result.branchName
+    && patch.baseCommitSha === (result.baseCommitSha ?? null)
+    && patch.headCommitSha === (result.headCommitSha ?? null)
+    && patch.filesChanged === result.filesChanged
+    && patch.additions === result.additions
+    && patch.deletions === result.deletions
+    && (patch.summary ?? '') === (result.summary ?? '')
+    && (result.componentId === undefined || workflow.componentId === result.componentId)
+    && (result.filePath === undefined || workflow.filePath === result.filePath)
+    && (result.diff === undefined || workflow.diff === result.diff);
+}
+
+export interface GenerationProposal {
+  branchName: string;
+  baseCommitSha: string;
+  componentId: string;
+  filePath: string;
+  diff: string;
+  summary: string;
+  filesChanged: number;
+  additions: number;
+  deletions: number;
 }
 
 export const workflowRepository = {
@@ -40,6 +61,37 @@ export const workflowRepository = {
     return getPrisma().patch.findFirst({
       where: { id: patchId, projectId, project: { ownerId } },
       select: patchSelect,
+    });
+  },
+
+  async saveGenerationProposal(projectId: string, patchId: string, generationId: string, proposal: GenerationProposal) {
+    const prisma = getPrisma();
+    return prisma.$transaction(async (tx: any) => {
+      const current = await tx.patch.findFirst({ where: { id: patchId, projectId }, select: patchSelect });
+      if (!current || current.status !== 'GENERATING') return null;
+      const details = current.validationDetails && typeof current.validationDetails === 'object' && !Array.isArray(current.validationDetails)
+        ? current.validationDetails as Record<string, unknown>
+        : {};
+      const activeWorkflow = workflowDetails(details);
+      if (activeWorkflow?.generationId !== generationId || activeWorkflow.outcome !== 'PENDING') return null;
+
+      const result = await tx.patch.updateMany({
+        where: { id: patchId, projectId, status: 'GENERATING', updatedAt: current.updatedAt },
+        data: {
+          branchName: proposal.branchName,
+          baseCommitSha: proposal.baseCommitSha,
+          summary: proposal.summary,
+          filesChanged: proposal.filesChanged,
+          additions: proposal.additions,
+          deletions: proposal.deletions,
+          validationDetails: {
+            ...details,
+            workflow: { ...activeWorkflow, generationId, outcome: 'PENDING', ...proposal },
+          },
+        },
+      });
+      if (result.count !== 1) return null;
+      return tx.patch.findFirst({ where: { id: patchId, projectId }, select: patchSelect });
     });
   },
 
@@ -59,8 +111,14 @@ export const workflowRepository = {
       const outcome = result.success ? 'SUCCEEDED' : 'FAILED';
       const validationDetails = {
         workflow: {
+          ...(activeWorkflow ?? {}),
           generationId: result.generationId,
           outcome,
+          ...(result.success ? {
+            ...(result.componentId ? { componentId: result.componentId } : {}),
+            ...(result.filePath ? { filePath: result.filePath } : {}),
+            ...(result.diff ? { diff: result.diff } : {}),
+          } : {}),
           ...(result.success ? {} : { failureCategory: result.failureCategory, errorSummary: result.errorSummary }),
           completedAt: new Date().toISOString(),
         },

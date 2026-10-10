@@ -9,6 +9,7 @@ import {
 import { ComponentResolverService } from '../../src/services/component-resolver.service';
 import { LocalRepositoryProvider } from '../../src/services/repository-provider.service';
 import {
+  GroqPatchProvider,
   MockPatchProvider,
   getPatchProvider,
   sanitizeInstructionNote,
@@ -145,6 +146,50 @@ describe('MockPatchProvider', () => {
       else process.env.LLM_PROVIDER = previous;
     }
     expect(getPatchProvider()).toBeInstanceOf(MockPatchProvider);
+  });
+});
+
+describe('GroqPatchProvider', () => {
+  it('uses trusted source context and reports only the authorized file', async () => {
+    process.env.GROQ_API_KEY = 'test-key';
+    const diff = [
+      '--- a/src/components/Hero.jsx',
+      '+++ b/src/components/Hero.jsx',
+      '@@ -4,1 +4,1 @@',
+      '-      <h1 data-patchwork-id="hero-heading">Persia Darbar</h1>',
+      '+      <h1 data-patchwork-id="hero-heading">Patchwork</h1>',
+      '',
+    ].join('\n');
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
+      ok: true,
+      text: async () => JSON.stringify({
+        choices: [{ message: { content: JSON.stringify({
+          diff,
+          changedFiles: ['../untrusted.jsx'],
+          summary: 'Update the hero title.',
+        }) } }],
+      }),
+    }));
+
+    const provider = new GroqPatchProvider();
+    const output = await provider.generate({
+      componentId: 'hero-heading',
+      instruction: 'Change the title to Patchwork.',
+      context: {
+        componentId: 'hero-heading',
+        filePath: 'src/components/Hero.jsx',
+        componentName: 'Hero',
+        sourceCode: HERO_SOURCE,
+      },
+    });
+
+    expect(output.provider).toBe('groq');
+    expect(output.simulated).toBe(false);
+    expect(output.changedFiles).toEqual(['src/components/Hero.jsx']);
+    expect(output.diff).toBe(diff);
+    expect(JSON.parse(vi.mocked(fetch).mock.calls[0][1]?.body as string).messages[0].content)
+      .toContain('Persia Darbar');
+    delete process.env.GROQ_API_KEY;
   });
 });
 

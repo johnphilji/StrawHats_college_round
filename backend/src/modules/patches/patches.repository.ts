@@ -16,7 +16,7 @@ export const patchesRepository = {
   async findOwnedProject(projectId: string, ownerId: string) {
     return getPrisma().project.findFirst({
       where: { id: projectId, ownerId },
-      select: { id: true },
+      select: { id: true, repositoryIdentifier: true, productionBranch: true },
     });
   },
 
@@ -62,6 +62,30 @@ export const patchesRepository = {
       skip,
       take,
       select: { id: true, action: true, message: true, metadata: true, createdAt: true },
+    });
+  },
+
+  async recordPullRequest(projectId: string, patchId: string, actorId: string, generationId: string, pullRequest: { number: number; url: string }) {
+    const prisma = getPrisma();
+    return prisma.$transaction(async (tx: any) => {
+      const current = await tx.patch.findFirst({ where: { id: patchId, projectId }, select: patchSelect });
+      if (!current || current.status !== 'APPROVED') return null;
+      if (current.pullRequestNumber !== null || current.pullRequestUrl !== null) {
+        return current.pullRequestNumber === pullRequest.number && current.pullRequestUrl === pullRequest.url ? current : null;
+      }
+      const updated = await tx.patch.updateMany({
+        where: { id: patchId, projectId, status: 'APPROVED', pullRequestNumber: null, pullRequestUrl: null },
+        data: { pullRequestNumber: pullRequest.number, pullRequestUrl: pullRequest.url },
+      });
+      if (updated.count !== 1) return null;
+      await tx.auditLog.create({
+        data: {
+          projectId, patchId, actorId, action: 'PATCH_PULL_REQUEST_CREATED',
+          message: `Pull request #${pullRequest.number} created`,
+          metadata: { generationId, pullRequestNumber: pullRequest.number, pullRequestUrl: pullRequest.url },
+        },
+      });
+      return tx.patch.findFirst({ where: { id: patchId, projectId }, select: patchSelect });
     });
   },
 

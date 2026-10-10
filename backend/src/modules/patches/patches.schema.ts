@@ -14,6 +14,18 @@ export const createPatchSchema = z.object({
   query: z.object({}).passthrough().optional(),
 });
 
+export const generatePatchSchema = z.object({
+  body: z.object({ componentId: z.string().trim().min(1).max(255) }),
+  params: patchParamsSchema,
+  query: z.object({}).passthrough().optional(),
+});
+
+export const createPatchPullRequestSchema = z.object({
+  body: z.object({}).strict().optional(),
+  params: patchParamsSchema,
+  query: z.object({}).passthrough().optional(),
+});
+
 export const updatePatchStatusSchema = z.object({
   body: z.object({
     // Full forward chain (DRAFT is initial-only and never set via this endpoint).

@@ -217,6 +217,12 @@
   border-color: #2563eb;
 }
 
+.connectionError {
+  margin: 0;
+  color: #b42318;
+  font-size: 12px;
+}
+
 .modalActions {
   display: flex;
   justify-content: flex-end;

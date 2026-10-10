@@ -1,4 +1,8 @@
 // Person 3 - Armaan (LLM and Git integration: Groq-powered patch generation, parsing, and validation)
+import { buildPatchBranchName } from '../git/branch';
+
+export { buildPatchBranchName } from '../git/branch';
+
 export type GroqPatchRequest = {
   componentId: string;
   instruction: string;
@@ -23,12 +27,6 @@ export function sanitizeBranchSegment(value: string): string {
     .replace(/[^a-z0-9]+/g, '-')
     .replace(/^-+|-+$/g, '')
     .slice(0, 40) || 'patch';
-}
-
-export function buildPatchBranchName(componentId: string): string {
-  const base = sanitizeBranchSegment(componentId);
-  const suffix = Math.random().toString(36).slice(2, 8);
-  return `patch/${base}-${suffix}`;
 }
 
 export function buildGroqPrompt(input: GroqPatchRequest): string {
@@ -119,34 +117,52 @@ export async function generatePatchFromGroq(input: GroqPatchRequest): Promise<Gr
   const prompt = buildGroqPrompt(input);
 
   try {
-    const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+    const request: RequestInit = {
       method: 'POST',
+      signal: AbortSignal.timeout(30_000),
       headers: {
         Authorization: `Bearer ${apiKey}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: process.env.GROQ_MODEL || 'llama-3.1-8b-instant',
+        model: process.env.GROQ_MODEL || 'openai/gpt-oss-20b',
         messages: [{ role: 'user', content: prompt }],
         temperature: 0.2,
         max_tokens: 800,
       }),
-    });
+    };
+    let response: Response | undefined;
+    for (let attempt = 0; attempt < 2; attempt += 1) {
+      try {
+        response = await fetch('https://api.groq.com/openai/v1/chat/completions', request);
+      } catch (error) {
+        if (attempt === 1) throw error;
+        continue;
+      }
+      if (response.ok || ![502, 503, 504].includes(response.status) || attempt === 1) break;
+    }
+    if (!response) throw new Error('Groq request did not return a response.');
 
     if (!response.ok) {
-      const errorText = await response.text();
       return {
         status: 'failed',
         message: 'Groq rejected the patch generation request.',
         branch,
         diff: '',
         changedFiles: [],
-        errors: [errorText || 'Unknown Groq error'],
+        errors: [`Groq returned HTTP ${response.status}.`],
         warnings: [],
       };
     }
 
-    const payload = (await response.json()) as {
+    const responseText = await response.text();
+    if (responseText.length > 1_000_000) {
+      return {
+        status: 'failed', message: 'Groq returned an oversized response.', branch,
+        diff: '', changedFiles: [], errors: ['Groq response exceeded the 1 MB limit.'], warnings: [],
+      };
+    }
+    const payload = JSON.parse(responseText) as {
       choices?: Array<{ message?: { content?: string } }>;
     };
 

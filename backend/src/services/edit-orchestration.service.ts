@@ -119,7 +119,9 @@ export class EditOrchestrationService {
       : {
           valid: false,
           changedFiles: [],
-          errors: ['provider returned an empty diff'],
+          errors: generated.errors?.length
+            ? generated.errors
+            : ['provider returned an empty diff'],
           warnings: [] as string[],
           addedLines: 0,
           removedLines: 0,
@@ -155,7 +157,7 @@ export class EditOrchestrationService {
       provider: generated.provider,
       simulated: generated.simulated,
       diff: generated.diff,
-      changedFiles: validation.valid ? generated.changedFiles : [],
+      changedFiles: validation.valid ? validation.changedFiles : [],
       summary: generated.summary,
       validation,
       isolatedPreviewApplied,

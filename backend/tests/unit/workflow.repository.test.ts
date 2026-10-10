@@ -51,4 +51,33 @@ describe('workflowRepository generation attempt binding', () => {
     expect(tx.patch.updateMany).not.toHaveBeenCalled();
     expect(tx.auditLog.create).not.toHaveBeenCalled();
   });
+
+  it('saves an idempotent proposal only for the active pending generation', async () => {
+    const current = {
+      id: 'patch-1', projectId: 'project-1', status: 'GENERATING', updatedAt: new Date(0),
+      validationDetails: { workflow: { generationId: attemptId, outcome: 'PENDING' } },
+    };
+    const tx = {
+      patch: {
+        findFirst: vi.fn().mockResolvedValueOnce(current).mockResolvedValueOnce({ ...current, branchName: 'patch/hero' }),
+        updateMany: vi.fn().mockResolvedValue({ count: 1 }),
+      },
+    };
+    vi.mocked(getPrisma).mockReturnValue({ $transaction: (fn: (client: typeof tx) => unknown) => fn(tx) } as never);
+
+    const proposal = {
+      branchName: 'patch/hero', baseCommitSha: 'a'.repeat(40), componentId: 'hero-heading',
+      filePath: 'src/components/Hero.jsx', diff: '--- diff', summary: 'Update hero',
+      filesChanged: 1, additions: 1, deletions: 1,
+    };
+    const result = await workflowRepository.saveGenerationProposal('project-1', 'patch-1', attemptId, proposal);
+
+    expect(result).toMatchObject({ branchName: 'patch/hero' });
+    expect(tx.patch.updateMany).toHaveBeenCalledWith(expect.objectContaining({
+      where: expect.objectContaining({ status: 'GENERATING', updatedAt: current.updatedAt }),
+      data: expect.objectContaining({ validationDetails: expect.objectContaining({
+        workflow: expect.objectContaining({ generationId: attemptId, outcome: 'PENDING', diff: '--- diff' }),
+      }) }),
+    }));
+  });
 });

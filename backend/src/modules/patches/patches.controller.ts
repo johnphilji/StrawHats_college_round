@@ -3,6 +3,7 @@ import { patchesService } from './patches.service';
 import type { PatchStatus, PatchRecord, PublicPatch } from './patches.types';
 import { patchHistoryQuerySchema } from './patches.schema';
 import { badRequest } from '../../shared/errors/AppError';
+import { patchGenerationService } from '../../services/patch-generation.service';
 
 function publicPatch(patch: PatchRecord): PublicPatch {
   const { validationDetails: _validationDetails, ...safePatch } = patch;
@@ -12,7 +13,13 @@ function publicPatch(patch: PatchRecord): PublicPatch {
   const workflow = details?.workflow && typeof details.workflow === 'object' && !Array.isArray(details.workflow)
     ? details.workflow as Record<string, unknown>
     : null;
-  return { ...safePatch, ...(typeof workflow?.generationId === 'string' ? { generationId: workflow.generationId } : {}) };
+  return {
+    ...safePatch,
+    ...(typeof workflow?.generationId === 'string' ? { generationId: workflow.generationId } : {}),
+    ...(typeof workflow?.componentId === 'string' ? { componentId: workflow.componentId } : {}),
+    ...(typeof workflow?.filePath === 'string' ? { filePath: workflow.filePath } : {}),
+    ...(typeof workflow?.diff === 'string' ? { diff: workflow.diff } : {}),
+  };
 }
 
 export const patchesController = {
@@ -37,6 +44,41 @@ export const patchesController = {
       req.user!.id,
     );
     res.status(200).json({ success: true, data: publicPatch(patch) });
+  },
+
+  async generate(req: Request, res: Response) {
+    const result = await patchGenerationService.generate(
+      req.user!,
+      req.params.projectId as string,
+      req.params.patchId as string,
+      req.body.componentId as string,
+    );
+    res.status(200).json({
+      success: true,
+      data: {
+        ...publicPatch(result.patch),
+        componentId: result.componentId,
+        componentName: result.componentName,
+        filePath: result.filePath,
+        diff: result.diff,
+        summary: result.summary,
+        provider: result.provider,
+        simulated: result.simulated,
+        validation: result.validation,
+        branchName: result.branchName,
+        baseCommitSha: result.baseCommitSha,
+        headCommitSha: result.headCommitSha,
+      },
+    });
+  },
+
+  async createPullRequest(req: Request, res: Response) {
+    const result = await patchesService.createPullRequest(
+      req.params.projectId as string,
+      req.params.patchId as string,
+      req.user!,
+    );
+    res.status(result.created ? 201 : 200).json({ success: true, data: result });
   },
 
   async history(req: Request, res: Response) {
