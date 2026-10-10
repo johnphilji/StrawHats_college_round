@@ -1,0 +1,249 @@
+.container {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg-base);
+  height: 100%;
+  overflow-y: auto;
+}
+
+.header {
+  padding: 24px 28px 18px 28px;
+  background: #ffffff;
+  border-bottom: 1px solid var(--border-default);
+}
+
+.titleRow {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 4px;
+}
+
+.title {
+  font-size: 20px;
+  font-weight: 800;
+  color: var(--text-primary);
+}
+
+.badgeWarning {
+  background: #fef2f2;
+  color: #dc2626;
+  border: 1px solid #fee2e2;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 99px;
+}
+
+.subtitle {
+  font-size: 13px;
+  color: var(--text-secondary);
+  max-width: 800px;
+}
+
+.body {
+  padding: 24px 28px;
+  max-width: 900px;
+}
+
+.cardInfo {
+  background: #ffffff;
+  border: 1px solid var(--border-default);
+  padding: 10px 14px;
+  border-radius: var(--radius-sm);
+  font-size: 12.5px;
+  margin-bottom: 16px;
+  color: var(--text-secondary);
+}
+
+.cardInfo code {
+  font-family: var(--font-mono);
+  color: var(--text-primary);
+  font-weight: 600;
+}
+
+.threeWayGrid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+.colCard {
+  background: #ffffff;
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md);
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+}
+
+.colCardA {
+  border-color: #bfdbfe;
+  background: #f8faff;
+}
+
+.colCardB {
+  border-color: #fecaca;
+  background: #fffafa;
+}
+
+.colHeader {
+  font-size: 10px;
+  font-weight: 800;
+  color: var(--text-muted);
+  letter-spacing: 0.05em;
+  margin-bottom: 4px;
+}
+
+.colAuthor {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin-bottom: 10px;
+}
+
+.colValBox {
+  background: #ffffff;
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-sm);
+  padding: 6px 8px;
+  font-size: 11px;
+  margin-bottom: 12px;
+}
+
+.colValBox code {
+  font-family: var(--font-mono);
+  font-weight: 600;
+}
+
+.previewBox {
+  background: var(--bg-base);
+  border: 1px dashed var(--border-default);
+  border-radius: var(--radius-sm);
+  padding: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-top: auto;
+  margin-bottom: 12px;
+}
+
+.mockBtn {
+  color: #ffffff;
+  border: none;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 8px 14px;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.acceptBtnA {
+  background: #2563eb;
+  color: #ffffff;
+  border: none;
+  padding: 8px;
+  border-radius: var(--radius-sm);
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.acceptBtnB {
+  background: #ef4444;
+  color: #ffffff;
+  border: none;
+  padding: 8px;
+  border-radius: var(--radius-sm);
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.smartMergeBanner {
+  background: #eff6ff;
+  border: 1px solid #bfdbfe;
+  border-radius: var(--radius-md);
+  padding: 14px 18px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+}
+
+.smartMergeTitle {
+  font-size: 13px;
+  font-weight: 700;
+  color: #1e40af;
+  margin-bottom: 2px;
+}
+
+.smartMergeDesc {
+  font-size: 12px;
+  color: #1d4ed8;
+}
+
+.smartMergeDesc code {
+  font-family: var(--font-mono);
+  background: #ffffff;
+  padding: 1px 4px;
+  border-radius: 3px;
+}
+
+.smartMergeBtn {
+  background: #2563eb;
+  color: #ffffff;
+  border: none;
+  padding: 9px 16px;
+  border-radius: var(--radius-sm);
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.resolvedCard {
+  text-align: center;
+  padding: 40px;
+  background: #ffffff;
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-lg);
+}
+
+.resolvedIcon {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: #ecfdf5;
+  color: #059669;
+  font-size: 20px;
+  font-weight: 800;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 auto 12px auto;
+}
+
+.resolvedTitle {
+  font-size: 16px;
+  font-weight: 800;
+  color: var(--text-primary);
+  margin-bottom: 6px;
+}
+
+.resolvedDesc {
+  font-size: 13px;
+  color: var(--text-secondary);
+  margin-bottom: 16px;
+}
+
+.reopenBtn {
+  background: var(--bg-base);
+  border: 1px solid var(--border-default);
+  padding: 7px 14px;
+  border-radius: var(--radius-sm);
+  font-size: 12px;
+  cursor: pointer;
+}
