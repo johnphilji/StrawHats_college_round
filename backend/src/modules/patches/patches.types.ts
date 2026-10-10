@@ -28,7 +28,7 @@ export interface PatchRecord {
 
 // validationDetails is retained on the internal record for trusted workflow code,
 // but its unstructured content is not safe to expose from public API responses.
-export type PublicPatch = Omit<PatchRecord, 'validationDetails'>;
+export type PublicPatch = Omit<PatchRecord, 'validationDetails'> & { generationId?: string };
 
 export interface CreatePatchData {
   projectId: string;

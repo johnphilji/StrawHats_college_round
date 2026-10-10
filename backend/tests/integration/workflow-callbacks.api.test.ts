@@ -53,6 +53,29 @@ describe('trusted workflow callbacks', () => {
     expect(workflowService.recordGeneration).not.toHaveBeenCalled();
   });
 
+  it('rejects expired timestamps and compressed request bodies', async () => {
+    const expiredTimestamp = String(Math.floor(Date.now() / 1000) - 301);
+    const rawBody = JSON.stringify(payload);
+    const expiredSignature = workerSignature(testConfig.workerSecret, expiredTimestamp, 'POST', path, rawBody);
+    const expired = await request(app).post(path)
+      .set('x-patchwork-timestamp', expiredTimestamp)
+      .set('x-patchwork-signature', expiredSignature)
+      .set('Content-Type', 'application/json')
+      .send(rawBody);
+    expect(expired.status).toBe(401);
+
+    const timestamp = String(Math.floor(Date.now() / 1000));
+    const signature = workerSignature(testConfig.workerSecret, timestamp, 'POST', path, rawBody);
+    const compressed = await request(app).post(path)
+      .set('x-patchwork-timestamp', timestamp)
+      .set('x-patchwork-signature', signature)
+      .set('Content-Encoding', 'gzip')
+      .set('Content-Type', 'application/json')
+      .send(rawBody);
+    expect(compressed.status).not.toBe(200);
+    expect(workflowService.recordGeneration).not.toHaveBeenCalled();
+  });
+
   it('rejects malformed result bodies before recording anything', async () => {
     const invalid = { ...payload, headCommitSha: 'not-a-sha' };
     const timestamp = String(Math.floor(Date.now() / 1000));

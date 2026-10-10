@@ -44,11 +44,17 @@ Key dirs:
 - `src/routes/` – health, component metadata & preview routes
 - `src/services/` – component-resolver, source, and repository-provider services
 - `src/modules/projects/` – minimal validated CRUD (auth required, owner-scoped)
-- `src/integrations/` – llm, github, vercel, playwright (stubs)
+- `src/integrations/` — provider boundaries and integration notes; inspect `src/services/` for the implemented GitHub App read integration
 - `src/shared/` – errors, types, constants
 - `src/jobs/` – placeholder for future workers
 - `prisma/` – schema (v7: no URL, uses prisma.config.ts)
 - `tests/` – unit + integration (Vitest + Supertest)
+
+## Patch workflow integrations
+
+See [API.md](./API.md) for the versioned request contracts. PATCHWORK currently stores patch, validation, release, and deployment lifecycle records. A trusted worker can report generation and validation outcomes through the signed internal callbacks; there is no queue, code-generation provider, or automatic worker dispatch in this repository. Starting a patch's `GENERATING` transition returns the server-created `generationId` the worker must use.
+
+The GitHub App integration can install and enumerate authorized repositories, retrieve metadata, read bounded source files, create namespaced patch branches, commit bounded text changes with fast-forward-only ref updates, and open idempotent pull requests. It never merges, deletes branches, or writes to protected/default branches. Configure the App's Contents and Pull requests repository permissions as documented in [API.md](./API.md); environment variables alone do not grant GitHub permissions. Deployment endpoints create and update tracking records only; no Vercel API integration or webhook verifier is configured.
 
 ---
 

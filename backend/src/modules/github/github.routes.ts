@@ -4,6 +4,7 @@ import { authenticate } from '../../middleware/authenticate';
 import { asyncHandler } from '../../shared/utils/async-handler';
 import { badRequest } from '../../shared/errors/AppError';
 import { githubAppService } from '../../services/github-app.service';
+import { commitPatchFilesSchema, createPatchBranchSchema, createPullRequestSchema, githubRepositoryIdSchema } from './github-write.schema';
 
 const router = Router();
 
@@ -49,6 +50,33 @@ router.get('/repositories/:repositoryId/source', asyncHandler(async (req, res) =
   if (!query.success) throw badRequest('A source path and optional valid ref are required.');
   const data = await githubAppService.readSource(req.user!, req.params.repositoryId as string, query.data.path, query.data.ref);
   res.status(200).json({ success: true, data });
+}));
+
+function parseWriteInput<T extends z.ZodType>(schema: T, input: unknown): z.infer<T> {
+  const parsed = schema.safeParse(input);
+  if (!parsed.success) throw badRequest('GitHub write request is invalid or exceeds the allowed limits.');
+  return parsed.data;
+}
+
+router.post('/repositories/:repositoryId/branches', asyncHandler(async (req, res) => {
+  const repositoryId = parseWriteInput(githubRepositoryIdSchema, req.params.repositoryId);
+  const input = parseWriteInput(createPatchBranchSchema, req.body);
+  const result = await githubAppService.createPatchBranch(req.user!, repositoryId, input);
+  res.status(result.created ? 201 : 200).json({ success: true, data: result });
+}));
+
+router.post('/repositories/:repositoryId/commits', asyncHandler(async (req, res) => {
+  const repositoryId = parseWriteInput(githubRepositoryIdSchema, req.params.repositoryId);
+  const input = parseWriteInput(commitPatchFilesSchema, req.body);
+  const result = await githubAppService.commitPatchFiles(req.user!, repositoryId, input);
+  res.status(result.committed ? 201 : 200).json({ success: true, data: result });
+}));
+
+router.post('/repositories/:repositoryId/pulls', asyncHandler(async (req, res) => {
+  const repositoryId = parseWriteInput(githubRepositoryIdSchema, req.params.repositoryId);
+  const input = parseWriteInput(createPullRequestSchema, req.body);
+  const result = await githubAppService.createPullRequest(req.user!, repositoryId, input);
+  res.status(result.created ? 201 : 200).json({ success: true, data: result });
 }));
 
 export default router;

@@ -6,7 +6,13 @@ import { badRequest } from '../../shared/errors/AppError';
 
 function publicPatch(patch: PatchRecord): PublicPatch {
   const { validationDetails: _validationDetails, ...safePatch } = patch;
-  return safePatch;
+  const details = patch.validationDetails && typeof patch.validationDetails === 'object' && !Array.isArray(patch.validationDetails)
+    ? patch.validationDetails as Record<string, unknown>
+    : null;
+  const workflow = details?.workflow && typeof details.workflow === 'object' && !Array.isArray(details.workflow)
+    ? details.workflow as Record<string, unknown>
+    : null;
+  return { ...safePatch, ...(typeof workflow?.generationId === 'string' ? { generationId: workflow.generationId } : {}) };
 }
 
 export const patchesController = {

@@ -48,6 +48,10 @@ export const workflowRepository = {
     return prisma.$transaction(async (tx: any) => {
       const current = await tx.patch.findFirst({ where: { id: patchId, projectId }, select: patchSelect });
       if (!current) return null;
+      const activeWorkflow = workflowDetails(current.validationDetails);
+      if (activeWorkflow?.generationId !== result.generationId || activeWorkflow.outcome !== 'PENDING') {
+        return current.status !== 'GENERATING' && sameGeneration(current, result) ? current : null;
+      }
       if (current.status !== 'GENERATING') {
         return sameGeneration(current, result) ? current : null;
       }

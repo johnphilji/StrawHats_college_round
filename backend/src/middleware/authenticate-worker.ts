@@ -26,7 +26,10 @@ export const authenticateWorker: RequestHandler = (req, _res, next) => {
   const signature = req.header('x-patchwork-signature') ?? '';
   const rawBody = (req as RequestWithRawBody).rawBody;
   const timestampSeconds = Number(timestamp);
-  if (!/^\d{10}$/.test(timestamp) || !Number.isSafeInteger(timestampSeconds) || Math.abs(Date.now() / 1000 - timestampSeconds) > MAX_CLOCK_SKEW_SECONDS || !rawBody || !/^sha256=[a-f0-9]{64}$/.test(signature)) {
+  const contentEncoding = req.header('content-encoding');
+  // body-parser inflates compressed bodies before invoking its verify hook.
+  // Refuse compression so the bytes authenticated here are the transmitted JSON bytes.
+  if ((contentEncoding && contentEncoding.toLowerCase() !== 'identity') || !/^\d{10}$/.test(timestamp) || !Number.isSafeInteger(timestampSeconds) || Math.abs(Date.now() / 1000 - timestampSeconds) > MAX_CLOCK_SKEW_SECONDS || !rawBody || !/^sha256=[a-f0-9]{64}$/.test(signature)) {
     next(unauthorized('Invalid trusted worker signature.'));
     return;
   }

@@ -57,9 +57,9 @@ export const releasesRepository = {
       if (!current) return null;
       if (current.status === input.status) {
         if (input.status === 'MERGED' && current.commitSha === input.commitSha) return current;
-        const priorEvent = await tx.auditLog.findFirst({ where: { releaseId }, orderBy: [{ createdAt: 'desc' }, { id: 'desc' }], select: { action: true, metadata: true } });
-        const metadata = priorEvent?.metadata as Record<string, unknown> | null;
         const action = input.status === 'FAILED' ? 'RELEASE_FAILED' : input.status === 'REVERTED' ? 'RELEASE_REVERTED' : 'RELEASE_MERGED';
+        const priorEvent = await tx.auditLog.findFirst({ where: { releaseId, action }, orderBy: [{ createdAt: 'desc' }, { id: 'desc' }], select: { action: true, metadata: true } });
+        const metadata = priorEvent?.metadata as Record<string, unknown> | null;
         if (priorEvent?.action === action && metadata?.errorSummary === input.errorSummary && metadata?.commitSha === input.commitSha) return current;
         return null;
       }

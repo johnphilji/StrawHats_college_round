@@ -14,7 +14,7 @@ All user endpoints require `Authorization: Bearer <Supabase access token>`. The 
 - `POST /api/projects/:projectId/patches` — create a draft from `{ "prompt": "..." }`.
 - `GET /api/projects/:projectId/patches` — list patches for an owned project.
 - `GET /api/projects/:projectId/patches/:patchId` — retrieve a patch in its project.
-- `PATCH /api/projects/:projectId/patches/:patchId/status` — owner-driven allowed transitions only: `DRAFT → GENERATING/CANCELLED`, `GENERATED → VALIDATING`, and `READY_FOR_REVIEW → APPROVED/REJECTED`. This endpoint cannot claim generation or validation success.
+- `PATCH /api/projects/:projectId/patches/:patchId/status` — owner-driven allowed transitions only: `DRAFT → GENERATING/CANCELLED`, `GENERATED → VALIDATING`, and `READY_FOR_REVIEW → APPROVED/REJECTED`. This endpoint cannot claim generation or validation success. When moving to `GENERATING`, the response includes a server-created `generationId`; the worker must use that exact ID in both result callbacks. The ID is also returned by patch reads while its workflow record remains available.
 - `GET /api/projects/:projectId/patches/:patchId/history?page=1&limit=20` — owner-scoped audit activity, ordered newest first by timestamp then ID. `limit` is 1–100. Sensitive/unrecognized audit metadata is omitted.
 
 ## Trusted generation and validation callbacks
@@ -27,7 +27,7 @@ The worker signs the exact raw UTF-8 JSON request body using this message:
 <unix-seconds>.<UPPERCASE-METHOD>.<path-without-query>.<raw-body>
 ```
 
-Send `X-Patchwork-Timestamp: <unix-seconds>` and `X-Patchwork-Signature: sha256=<lowercase HMAC-SHA256 hex>`. The timestamp must be within five minutes. Example Node signing code:
+Send `X-Patchwork-Timestamp: <unix-seconds>` and `X-Patchwork-Signature: sha256=<lowercase HMAC-SHA256 hex>`. The timestamp must be within five minutes. Send uncompressed JSON: compressed requests are rejected so signature verification uses the exact request-body bytes. Requests can be replayed during that five-minute window; lifecycle callbacks are designed to be idempotent and reject conflicting/stale outcomes, but this mechanism is not a distributed one-time nonce store. Example Node signing code:
 
 ```ts
 const timestamp = String(Math.floor(Date.now() / 1000));
@@ -57,11 +57,11 @@ const signature = createHmac('sha256', workerSecret)
 }
 ```
 
-Failure uses `success: false`, `failureCategory` (`GENERATION_ERROR`, `VALIDATION_ERROR`, `TIMEOUT`, `CANCELLED`, or `UNKNOWN`) and a bounded `errorSummary`. It records `FAILED`; it does not claim a branch or commit was created. A patch must be in `GENERATING`. Repeated matching callbacks are idempotent; a different/stale attempt is rejected. Generation details are not included in ordinary patch responses.
+Failure uses `success: false`, `failureCategory` (`GENERATION_ERROR`, `VALIDATION_ERROR`, `TIMEOUT`, `CANCELLED`, or `UNKNOWN`) and a bounded `errorSummary`. It records `FAILED`; it does not claim a branch or commit was created. A patch must be in `GENERATING`, and its callback `generationId` must match the ID created when PATCHWORK moved it to `GENERATING`. Repeated matching callbacks are idempotent; a different/stale attempt is rejected. Public patch responses expose only this correlation ID, not internal workflow or validation details.
 
 - `POST /api/internal/projects/:projectId/patches/:patchId/validation-result` records validation for the same `generationId` after an owner has moved the patch to `VALIDATING`. Body: `{ "type": "validation", "generationId": "...", "passed": true, "results": [{ "name": "typecheck", "status": "PASSED", "summary": "optional" }] }`. Result status is `PASSED`, `FAILED`, or `SKIPPED`; up to 100 results are allowed. Passed validation moves to `READY_FOR_REVIEW`; failure moves to `VALIDATION_FAILED`. Identical retries are idempotent. Raw error summaries are not exposed by the history API.
 
-Callbacks validate that the patch belongs to the project in the path and write the patch result plus its audit event in one transaction. There is no generation engine or queue in this repository; Person 3 must call the existing patch status API to start/advance work, perform generation/validation, then send these signed callbacks. The backend never fabricates successful results.
+Callbacks validate that the patch belongs to the project in the path and write the patch result plus its audit event in one transaction. There is no generation engine, queue, or automatic dispatch in this repository. Person 3 must call the owner-authenticated status API to start/advance work, read the returned `generationId`, perform generation/validation, then send these signed callbacks with that ID. The backend never fabricates successful results.
 
 ## Deployment tracking
 
@@ -88,3 +88,21 @@ No GitHub merge, revert, or rollback operation is implemented. A trusted integra
 - Example worker secret generation: `node -e "console.log(require('node:crypto').randomBytes(32).toString('hex'))"`. Store the resulting value only in backend and worker secret stores; do not paste it into source files or documentation.
 
 GitHub OAuth login through Supabase and GitHub App repository installation remain separate flows; see [GITHUB_INTEGRATION.md](../GITHUB_INTEGRATION.md).
+
+## Safe GitHub repository writes
+
+The following endpoints require the normal Supabase bearer token and use only the GitHub App installation linked to that authenticated Supabase user. The backend resolves repository IDs through GitHub using that installation; callers cannot provide an owner/name pair or GitHub API URL. Every write mints a short-lived installation token scoped to the permissions listed below. If the installation has not been granted those permissions, the API returns `403` and performs no write.
+
+- `POST /api/github/repositories/:repositoryId/branches` — body `{ "branchName": "patchwork/<name>", "baseRef": "main-or-commit-sha" }`. The base branch or 40/64-character commit is verified in the authorized repository before a ref is created. Branch names must use the `patchwork/` namespace. Repeating a request for the same branch and base is idempotent (`200`, `created: false`); an existing branch at another commit conflicts. The repository default branch is never a write target.
+- `POST /api/github/repositories/:repositoryId/commits` — body `{ "branchName": "patchwork/<name>", "expectedHeadSha": "<sha>", "idempotencyKey": "<uuid>", "message": "...", "files": [{ "path": "src/App.tsx", "content": "..." }] }`. The backend verifies the branch exists, is not protected or the default branch, and still points to `expectedHeadSha`. It creates regular UTF-8 text blobs and a tree, then updates the ref with `force: false`. Limits: 25 files, 128 KiB per file, 450 KiB combined, 200-character commit message. Paths must be relative and use allowed source extensions; traversal, `.git`, `.github`, environment, credential, key, and secret paths are rejected. The endpoint only adds/replaces files; it does not delete files. Reusing an idempotency UUID with the same payload returns the already-applied commit (`200`, `committed: false`); if the branch moved for another reason, the request conflicts and must be reviewed before retrying.
+- `POST /api/github/repositories/:repositoryId/pulls` — body `{ "branchName": "patchwork/<name>", "baseBranch": "main", "idempotencyKey": "<uuid>", "title": "...", "body": "optional" }`. Both branches are verified in the same authorized repository, and the head must be an unprotected `patchwork/` branch. A matching existing request is returned idempotently; a different existing PR for the same head/base conflicts.
+
+GitHub App repository permissions required in the GitHub App settings:
+
+- `Contents: Read and write` for creating refs, blobs, trees, and commits. Source reads continue to work with this permission.
+- `Pull requests: Read and write` for checking and creating pull requests.
+- `Metadata: Read-only` is the standard required repository permission.
+
+In GitHub, open **Settings → Developer settings → GitHub Apps → PATCHWORK → Permissions & events → Repository permissions**, set the permissions above, save the changes, then accept the permission update for each existing installation (or reinstall/authorize the App). The backend requests only `Contents: write` for branch/commit calls and `Contents: read` plus `Pull requests: write` for PR calls. The project's private key and App ID do not prove these dashboard permissions were granted; actual access depends on the installed App's approved permissions and repository selection.
+
+These endpoints never merge a pull request, delete a branch, write to a default/protected branch, or publish a release. Tests mock all GitHub API calls; no live repository write has been performed.

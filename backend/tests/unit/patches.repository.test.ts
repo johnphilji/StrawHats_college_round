@@ -25,7 +25,7 @@ describe('patchesRepository', () => {
     const events: string[] = [];
     const tx = {
       patch: {
-        updateMany: vi.fn(async ({ where }: { where: Record<string, unknown> }) => {
+        updateMany: vi.fn(async ({ where }: { where: Record<string, unknown>; data: Record<string, any> }) => {
           events.push('patch');
           expect(where).toEqual({ id: 'patch-1', projectId: 'project-1', status: 'DRAFT' });
           return { count: 1 };
@@ -42,11 +42,16 @@ describe('patchesRepository', () => {
     expect(transaction).toHaveBeenCalledOnce();
     expect(tx.patch.updateMany).toHaveBeenCalledWith(expect.objectContaining({
       where: { id: 'patch-1', projectId: 'project-1', status: 'DRAFT' },
-      data: { status: 'GENERATING' },
+      data: expect.objectContaining({
+        status: 'GENERATING',
+        validationDetails: expect.objectContaining({ workflow: expect.objectContaining({ outcome: 'PENDING' }) }),
+      }),
     }));
+    const generationId = tx.patch.updateMany.mock.calls[0][0].data.validationDetails.workflow.generationId;
+    expect(generationId).toMatch(/^[0-9a-f-]{36}$/);
     expect(tx.auditLog.create).toHaveBeenCalledWith({ data: expect.objectContaining({
       projectId: 'project-1', patchId: 'patch-1', actorId: 'user-1',
-      action: 'PATCH_GENERATION_STARTED', metadata: { from: 'DRAFT', to: 'GENERATING' },
+      action: 'PATCH_GENERATION_STARTED', metadata: { from: 'DRAFT', to: 'GENERATING', generationId },
     }) });
     expect(events).toEqual(['patch', 'audit']);
     expect(updated.status).toBe('GENERATING');

@@ -1,4 +1,4 @@
-import { createHmac, randomBytes, sign as cryptoSign, timingSafeEqual } from 'node:crypto';
+import { createHash, createHmac, randomBytes, sign as cryptoSign, timingSafeEqual } from 'node:crypto';
 import { createClient } from '@supabase/supabase-js';
 import { getEnv } from '../config/env';
 import { badRequest, conflict, forbidden, notFound, AppError } from '../shared/errors/AppError';
@@ -7,8 +7,12 @@ import type { AuthenticatedUser } from '../shared/types/api';
 const API = 'https://api.github.com';
 const MAX_FILE_BYTES = 256 * 1024;
 const SOURCE_EXTENSIONS = new Set(['.ts', '.tsx', '.js', '.jsx', '.css', '.scss', '.sass', '.less', '.json', '.html', '.svg', '.md', '.mdx', '.vue', '.svelte']);
-const BLOCKED_NAMES = /^(\.env(?:\..*)?|\.npmrc|\.pypirc|\.netrc|.*\.(?:pem|key|p12|pfx|keystore))$|(?:credential|secret|service[-_]?account|firebase-adminsdk|id_(?:rsa|ed25519|ecdsa))/i;
+const BLOCKED_NAMES = /^(\.env(?:\..*|rc)?|\.npmrc|\.pypirc|\.netrc|.*\.(?:pem|key|p12|pfx|keystore))$|(?:credential|secret|password|private[-_]?key|access[-_]?token|service[-_]?account|firebase-adminsdk|id_(?:rsa|ed25519|ecdsa))/i;
 const BLOCKED_DIRECTORIES = new Set(['.ssh', 'credentials', 'secrets', 'private', 'keys']);
+const WRITE_EXTENSIONS = new Set(['.ts', '.tsx', '.js', '.jsx', '.css', '.scss', '.sass', '.less', '.json', '.html', '.svg', '.md', '.mdx', '.vue', '.svelte']);
+const MAX_WRITE_FILES = 25;
+const MAX_WRITE_FILE_BYTES = 128 * 1024;
+const MAX_WRITE_TOTAL_BYTES = 450 * 1024;
 
 type GithubInstallation = { id: number; account?: { id: number; login: string; type: string }; repository_selection?: string };
 type GithubRepository = { id: number; name: string; full_name: string; private: boolean; description: string | null; html_url: string; default_branch: string; owner: { login: string } };
@@ -16,6 +20,10 @@ type GithubContent = { type: string; size: number; encoding: string; content: st
 type SetupState = { userId: string; githubAccountId: string; exp: number; nonce: string };
 type StoredSetupState = Omit<SetupState, 'nonce'> & { status: 'pending' | 'consumed' };
 type SupabaseUser = { identities?: Array<{ provider?: string; identity_data?: Record<string, unknown> }>; app_metadata?: Record<string, unknown> };
+type PatchFile = { path: string; content: string };
+type GithubBranch = { name: string; protected: boolean; commit: { sha: string } };
+type GithubGitCommit = { sha: string; message: string; tree: { sha: string } };
+type GithubPullRequest = { number: number; html_url: string; state: string; title: string; body: string | null; head: { ref: string }; base: { ref: string } };
 
 export type GithubAppOptions = {
   appId?: string;
@@ -137,10 +145,24 @@ export class GithubAppService {
     return `${content}.${cryptoSign('RSA-SHA256', Buffer.from(content), privateKey).toString('base64url')}`;
   }
 
-  private async github<T>(url: string, token: string): Promise<T> {
-    const response = await this.fetcher(url, { headers: { Accept: 'application/vnd.github+json', Authorization: `Bearer ${token}`, 'X-GitHub-Api-Version': '2022-11-28' } });
+  private async githubResponse(url: string, token: string, init: RequestInit = {}): Promise<Response> {
+    let response: Response;
+    try {
+      response = await this.fetcher(url, {
+        ...init,
+        headers: { Accept: 'application/vnd.github+json', ...init.headers, Authorization: `Bearer ${token}`, 'X-GitHub-Api-Version': '2022-11-28', ...(init.body ? { 'Content-Type': 'application/json' } : {}) },
+      });
+    } catch {
+      throw new AppError('GitHub repository service is temporarily unavailable.', { statusCode: 502, code: 'INTERNAL_ERROR' });
+    }
+    return response;
+  }
+
+  private async github<T>(url: string, token: string, init: RequestInit = {}): Promise<T> {
+    const response = await this.githubResponse(url, token, init);
     if (!response.ok) {
       if (response.status === 404 || response.status === 403) throw forbidden('GitHub did not authorize this repository operation.');
+      if (response.status === 409 || response.status === 422) throw conflict('GitHub rejected the repository operation because its state or permissions do not allow it.');
       throw new AppError('GitHub repository service is temporarily unavailable.', { statusCode: 502, code: 'INTERNAL_ERROR' });
     }
     return response.json() as Promise<T>;
@@ -168,14 +190,17 @@ export class GithubAppService {
     if (update.error) throw new AppError('Could not complete the GitHub connection.', { statusCode: 502, code: 'INTERNAL_ERROR' });
   }
 
-  private async installationToken(user: AuthenticatedUser): Promise<string> {
+  private async installationToken(user: AuthenticatedUser, permissions?: Record<string, 'read' | 'write'>): Promise<string> {
     this.assertConfigured();
     const installationId = (user.app_metadata as Record<string, unknown> | undefined)?.patchwork_github_installation_id;
     if (!Number.isSafeInteger(installationId) || Number(installationId) < 1) throw forbidden('Connect a GitHub App installation before accessing repositories.');
     const response = await this.fetcher(`${API}/app/installations/${installationId}/access_tokens`, {
-      method: 'POST', headers: { Accept: 'application/vnd.github+json', Authorization: `Bearer ${await this.appJwt()}`, 'X-GitHub-Api-Version': '2022-11-28', 'Content-Type': 'application/json' }, body: JSON.stringify({}),
+      method: 'POST', headers: { Accept: 'application/vnd.github+json', Authorization: `Bearer ${await this.appJwt()}`, 'X-GitHub-Api-Version': '2022-11-28', 'Content-Type': 'application/json' }, body: JSON.stringify(permissions ? { permissions } : {}),
     });
-    if (!response.ok) throw forbidden('GitHub installation is unavailable or no longer authorized.');
+    if (!response.ok) {
+      if (response.status === 403 || response.status === 422) throw forbidden('The GitHub App installation is missing the repository permissions required for this operation.');
+      throw new AppError('GitHub installation is temporarily unavailable.', { statusCode: 502, code: 'INTERNAL_ERROR' });
+    }
     const tokenData = await response.json() as { token?: string };
     if (!tokenData.token) throw new AppError('Could not authorize the GitHub installation.', { statusCode: 502, code: 'INTERNAL_ERROR' });
     return tokenData.token;
@@ -191,9 +216,176 @@ export class GithubAppService {
     return { id: repo.id, name: repo.name, fullName: repo.full_name, owner: repo.owner.login, private: repo.private, description: repo.description, url: repo.html_url, defaultBranch: repo.default_branch };
   }
 
-  private async authorizedRepository(user: AuthenticatedUser, idInput: string): Promise<{ token: string; repo: GithubRepository }> {
+  private repositoryApiPath(repo: GithubRepository): string {
+    return `/repos/${encodeURIComponent(repo.owner.login)}/${encodeURIComponent(repo.name)}`;
+  }
+
+  private validatePatchBranchName(branchName: string): void {
+    if (typeof branchName !== 'string' || branchName.length > 255 || !branchName.startsWith('patchwork/') || branchName.split('/').some((part) => !part || part === '.' || part === '..') || branchName.includes('..') || branchName.includes('//') || branchName.includes('@{') || /[\x00-\x20~^:?*[\\\]]/.test(branchName) || branchName.endsWith('.') || branchName.toLowerCase().endsWith('.lock')) {
+      throw badRequest('Branch names must be valid Git refs under patchwork/.');
+    }
+  }
+
+  private validateWriteFiles(files: PatchFile[]): void {
+    if (!Array.isArray(files) || files.length < 1 || files.length > MAX_WRITE_FILES) throw badRequest(`A commit must contain between 1 and ${MAX_WRITE_FILES} files.`);
+    const seen = new Set<string>();
+    let totalBytes = 0;
+    for (const file of files) {
+      const filePath = file?.path;
+      if (typeof filePath !== 'string' || !filePath || filePath.length > 500 || /[\\:\u0000-\u001f\u007f]/.test(filePath) || filePath.startsWith('/') || /^[a-zA-Z]:/.test(filePath) || filePath.split('/').some((part) => !part || part === '.' || part === '..' || /[ .]$/.test(part) || /^(?:con|prn|aux|nul|com[1-9]|lpt[1-9])(?:\..*)?$/i.test(part))) {
+        throw badRequest('File paths must be safe relative paths within the repository.');
+      }
+      const parts = filePath.split('/');
+      if (parts.some((part, index) => part.toLowerCase() === '.git' || part.toLowerCase() === '.github' || BLOCKED_NAMES.test(part) || (index < parts.length - 1 && BLOCKED_DIRECTORIES.has(part.toLowerCase()))) || !WRITE_EXTENSIONS.has(filePath.slice(filePath.lastIndexOf('.')).toLowerCase())) {
+        throw forbidden('This file path is not allowed for repository writes.');
+      }
+      if (seen.has(filePath)) throw badRequest('File paths in a commit must be unique.');
+      seen.add(filePath);
+      if (typeof file.content !== 'string' || /[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/.test(file.content)) throw badRequest('File content must be UTF-8 text without unsafe control characters.');
+      const size = Buffer.byteLength(file.content, 'utf8');
+      if (size > MAX_WRITE_FILE_BYTES) throw badRequest('A file exceeds the per-file write limit.');
+      totalBytes += size;
+    }
+    if (totalBytes > MAX_WRITE_TOTAL_BYTES) throw badRequest('Combined file content exceeds the commit write limit.');
+  }
+
+  private async getBranch(token: string, repo: GithubRepository, name: string): Promise<GithubBranch | null> {
+    const response = await this.githubResponse(`${API}${this.repositoryApiPath(repo)}/branches/${name.split('/').map(encodeURIComponent).join('/')}`, token);
+    if (response.status === 404) return null;
+    if (!response.ok) {
+      if (response.status === 403) throw forbidden('The GitHub App installation is missing repository read/write access required for this operation.');
+      throw new AppError('GitHub repository service is temporarily unavailable.', { statusCode: 502, code: 'INTERNAL_ERROR' });
+    }
+    return response.json() as Promise<GithubBranch>;
+  }
+
+  async createPatchBranch(user: AuthenticatedUser, repositoryId: string, input: { branchName: string; baseRef: string }) {
+    this.validatePatchBranchName(input.branchName);
+    if (typeof input.baseRef !== 'string' || !input.baseRef.trim() || input.baseRef.length > 255 || /[\x00-\x20\\]/.test(input.baseRef) || input.baseRef.includes('..') || input.baseRef.startsWith('/') || input.baseRef.endsWith('/')) throw badRequest('Invalid base branch or commit.');
+    const { token, repo } = await this.authorizedRepository(user, repositoryId, { contents: 'write' });
+    if (input.branchName === repo.default_branch) throw forbidden('The repository default branch is protected from PATCHWORK writes.');
+
+    let baseCommitSha: string;
+    if (/^(?:[a-fA-F0-9]{40}|[a-fA-F0-9]{64})$/.test(input.baseRef)) {
+      const commit = await this.github<{ sha: string }>(`${API}${this.repositoryApiPath(repo)}/commits/${input.baseRef}`, token);
+      if (commit.sha.toLowerCase() !== input.baseRef.toLowerCase()) throw badRequest('The requested base commit could not be verified.');
+      baseCommitSha = commit.sha;
+    } else {
+      const baseBranch = await this.getBranch(token, repo, input.baseRef);
+      if (!baseBranch || baseBranch.name !== input.baseRef || !/^(?:[a-fA-F0-9]{40}|[a-fA-F0-9]{64})$/.test(baseBranch.commit.sha)) throw badRequest('The requested base branch could not be verified.');
+      baseCommitSha = baseBranch.commit.sha;
+    }
+
+    const existing = await this.getBranch(token, repo, input.branchName);
+    if (existing) {
+      if (existing.protected) throw forbidden('PATCHWORK cannot write to a protected branch.');
+      if (existing.commit.sha === baseCommitSha) return { repository: this.safeRepository(repo), branchName: input.branchName, baseCommitSha, headCommitSha: existing.commit.sha, created: false };
+      throw conflict('A branch with this name already exists at a different commit. Choose a new patch branch name.');
+    }
+
+    const response = await this.githubResponse(`${API}${this.repositoryApiPath(repo)}/git/refs`, token, {
+      method: 'POST', body: JSON.stringify({ ref: `refs/heads/${input.branchName}`, sha: baseCommitSha }),
+    });
+    if (response.status === 201) {
+      const data = await response.json() as { ref?: string; object?: { sha?: string } };
+      return { repository: this.safeRepository(repo), branchName: input.branchName, baseCommitSha, headCommitSha: data.object?.sha ?? baseCommitSha, created: true };
+    }
+    if (response.status === 422 || response.status === 409) {
+      const racedBranch = await this.getBranch(token, repo, input.branchName);
+      if (racedBranch && !racedBranch.protected && racedBranch.commit.sha === baseCommitSha) return { repository: this.safeRepository(repo), branchName: input.branchName, baseCommitSha, headCommitSha: racedBranch.commit.sha, created: false };
+      throw conflict('GitHub could not create the requested patch branch. It may already exist or be protected.');
+    }
+    if (response.status === 403) throw forbidden('The GitHub App installation is missing Contents: write permission.');
+    throw new AppError('GitHub could not create the patch branch.', { statusCode: 502, code: 'INTERNAL_ERROR' });
+  }
+
+  async commitPatchFiles(user: AuthenticatedUser, repositoryId: string, input: { branchName: string; expectedHeadSha: string; idempotencyKey: string; message: string; files: PatchFile[] }) {
+    this.validatePatchBranchName(input.branchName);
+    this.validateWriteFiles(input.files);
+    if (!/^(?:[a-fA-F0-9]{40}|[a-fA-F0-9]{64})$/.test(input.expectedHeadSha) || !/^[0-9a-f-]{36}$/i.test(input.idempotencyKey) || !input.message.trim() || input.message.length > 200) throw badRequest('Commit metadata is invalid.');
+    const { token, repo } = await this.authorizedRepository(user, repositoryId, { contents: 'write' });
+    if (input.branchName === repo.default_branch) throw forbidden('The repository default branch is protected from PATCHWORK writes.');
+
+    const expectedHeadSha = input.expectedHeadSha.toLowerCase();
+    const operationPayload = JSON.stringify({ branchName: input.branchName, expectedHeadSha, message: input.message, files: [...input.files].sort((a, b) => a.path < b.path ? -1 : a.path > b.path ? 1 : 0) });
+    const payloadHash = createHash('sha256').update(operationPayload).digest('hex');
+    const branch = await this.getBranch(token, repo, input.branchName);
+    if (!branch) throw notFound('Patch branch was not found in this repository.');
+    if (branch.protected) throw forbidden('PATCHWORK cannot write to a protected branch.');
+    if (branch.name === repo.default_branch) throw forbidden('The repository default branch is protected from PATCHWORK writes.');
+
+    const operationMarker = `Patchwork-Operation: ${input.idempotencyKey}`;
+    const payloadMarker = `Patchwork-Payload-SHA256: ${payloadHash}`;
+    if (branch.commit.sha.toLowerCase() !== expectedHeadSha) {
+      const latest = await this.github<GithubGitCommit>(`${API}${this.repositoryApiPath(repo)}/git/commits/${branch.commit.sha}`, token);
+      if (latest.message.includes(operationMarker) && latest.message.includes(payloadMarker)) {
+        return { repository: this.safeRepository(repo), branchName: input.branchName, commitSha: latest.sha, committed: false };
+      }
+      throw conflict('Patch branch changed since the expected head commit. Refresh it before retrying.');
+    }
+
+    const parent = await this.github<GithubGitCommit>(`${API}${this.repositoryApiPath(repo)}/git/commits/${expectedHeadSha}`, token);
+    const blobs = await Promise.all(input.files.map(async (file) => {
+      const blob = await this.github<{ sha: string }>(`${API}${this.repositoryApiPath(repo)}/git/blobs`, token, {
+        method: 'POST', body: JSON.stringify({ content: file.content, encoding: 'utf-8' }),
+      });
+      return { path: file.path, mode: '100644', type: 'blob', sha: blob.sha };
+    }));
+    const tree = await this.github<{ sha: string }>(`${API}${this.repositoryApiPath(repo)}/git/trees`, token, {
+      method: 'POST', body: JSON.stringify({ base_tree: parent.tree.sha, tree: blobs }),
+    });
+    const commit = await this.github<{ sha: string }>(`${API}${this.repositoryApiPath(repo)}/git/commits`, token, {
+      method: 'POST', body: JSON.stringify({ message: `${input.message}\n\n${operationMarker}\n${payloadMarker}`, tree: tree.sha, parents: [expectedHeadSha] }),
+    });
+    const refPath = `${API}${this.repositoryApiPath(repo)}/git/refs/heads/${input.branchName.split('/').map(encodeURIComponent).join('/')}`;
+    const update = await this.githubResponse(refPath, token, { method: 'PATCH', body: JSON.stringify({ sha: commit.sha, force: false }) });
+    if (!update.ok) {
+      const current = await this.getBranch(token, repo, input.branchName);
+      if (current?.commit.sha === commit.sha) return { repository: this.safeRepository(repo), branchName: input.branchName, commitSha: commit.sha, committed: false };
+      if (update.status === 403) throw forbidden('The GitHub App installation is missing Contents: write permission.');
+      if (update.status === 409 || update.status === 422) throw conflict('Patch branch changed concurrently; no non-fast-forward update was performed.');
+      throw new AppError('GitHub could not update the patch branch.', { statusCode: 502, code: 'INTERNAL_ERROR' });
+    }
+    return { repository: this.safeRepository(repo), branchName: input.branchName, commitSha: commit.sha, committed: true };
+  }
+
+  async createPullRequest(user: AuthenticatedUser, repositoryId: string, input: { branchName: string; baseBranch: string; idempotencyKey: string; title: string; body?: string }) {
+    this.validatePatchBranchName(input.branchName);
+    if (!input.baseBranch || input.baseBranch.length > 255 || /[\x00-\x20\\]/.test(input.baseBranch) || input.baseBranch.includes('..') || input.baseBranch.startsWith('/') || input.baseBranch.endsWith('/') || !/^[0-9a-f-]{36}$/i.test(input.idempotencyKey) || !input.title.trim() || input.title.length > 200 || (input.body?.length ?? 0) > 10_000) throw badRequest('Pull request metadata is invalid.');
+    const { token, repo } = await this.authorizedRepository(user, repositoryId, { contents: 'read', pull_requests: 'write' });
+    if (input.branchName === input.baseBranch || input.branchName === repo.default_branch) throw badRequest('A pull request requires a distinct patch branch and base branch.');
+    const [head, base] = await Promise.all([this.getBranch(token, repo, input.branchName), this.getBranch(token, repo, input.baseBranch)]);
+    if (!head || !base || head.name !== input.branchName || base.name !== input.baseBranch) throw notFound('The pull request head or base branch is not available in this repository.');
+    if (head.protected) throw forbidden('PATCHWORK cannot create a pull request from a protected head branch.');
+
+    const marker = `<!-- patchwork-operation:${input.idempotencyKey}:${createHash('sha256').update(JSON.stringify({ branchName: input.branchName, baseBranch: input.baseBranch, title: input.title, body: input.body ?? '' })).digest('hex')} -->`;
+    let previous: GithubPullRequest | undefined;
+    for (let page = 1; page <= 10 && !previous; page += 1) {
+      const listUrl = new URL(`${API}${this.repositoryApiPath(repo)}/pulls`);
+      listUrl.searchParams.set('state', 'all');
+      listUrl.searchParams.set('head', `${repo.owner.login}:${input.branchName}`);
+      listUrl.searchParams.set('base', input.baseBranch);
+      listUrl.searchParams.set('per_page', '100');
+      listUrl.searchParams.set('page', String(page));
+      const existing = await this.github<GithubPullRequest[]>(listUrl.toString(), token);
+      previous = existing.find((pull) => pull.head.ref === input.branchName && pull.base.ref === input.baseBranch);
+      if (existing.length < 100) break;
+      if (page === 10 && !previous) throw conflict('Could not safely confirm pull request idempotency; review the repository before retrying.');
+    }
+    if (previous) {
+      if (previous.body?.includes(marker)) return { repository: this.safeRepository(repo), number: previous.number, url: previous.html_url, state: previous.state, created: false };
+      throw conflict('A pull request already exists for this branch and base with a different request.');
+    }
+
+    const response = await this.github<{ number: number; html_url: string; state: string }>(`${API}${this.repositoryApiPath(repo)}/pulls`, token, {
+      method: 'POST', body: JSON.stringify({ title: input.title, head: input.branchName, base: input.baseBranch, body: [input.body?.trim(), marker].filter(Boolean).join('\n\n') }),
+    });
+    return { repository: this.safeRepository(repo), number: response.number, url: response.html_url, state: response.state, created: true };
+  }
+
+  private async authorizedRepository(user: AuthenticatedUser, idInput: string, permissions?: Record<string, 'read' | 'write'>): Promise<{ token: string; repo: GithubRepository }> {
     if (!/^\d{1,20}$/.test(idInput) || !Number.isSafeInteger(Number(idInput))) throw badRequest('Repository ID must be a numeric GitHub repository ID.');
-    const token = await this.installationToken(user);
+    const token = await this.installationToken(user, permissions);
     let repo: GithubRepository;
     try {
       repo = await this.github<GithubRepository>(`${API}/repositories/${idInput}`, token);
