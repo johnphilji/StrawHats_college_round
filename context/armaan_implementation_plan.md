@@ -1,3 +1,4 @@
+<!-- Person 3 - Armaan (LLM and Git integration: implementation plan for the LLM + Git workflow) -->
 # PATCHWORK — Implementation Plan for Person 3: LLM & Git Workflow
 
 ## 1. Role in the team
