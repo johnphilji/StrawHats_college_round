@@ -1,0 +1,16 @@
+{
+  "name": "patchwork-monorepo",
+  "private": true,
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "concurrently \"npm run dev -w @patchwork/dashboard\" \"npm run dev -w @patchwork/server\" \"npm run dev -w @patchwork/target-site\"",
+    "test": "npm run test -w @patchwork/dashboard",
+    "seed": "node scripts/seed.js"
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.2"
+  }
+}

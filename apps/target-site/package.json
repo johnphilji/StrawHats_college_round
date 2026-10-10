@@ -1,0 +1,6 @@
+{
+  "name": "@patchwork/target-site",
+  "scripts": {
+    "dev": "echo 'Target site not implemented yet'"
+  }
+}

@@ -1,0 +1,6 @@
+{
+  "name": "@patchwork/server",
+  "scripts": {
+    "dev": "echo 'Server not implemented yet'"
+  }
+}
