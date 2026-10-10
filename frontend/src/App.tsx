@@ -34,9 +34,38 @@ function App() {
 
   useEffect(() => {
     if (!supabase) { setAuthLoading(false); return }
-    void supabase.auth.getSession().then(({ data }) => setSession(data.session)).finally(() => setAuthLoading(false))
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, nextSession) => setSession(nextSession))
-    return () => subscription.unsubscribe()
+    let active = true
+    void (async () => {
+      const isAuthCallback = window.location.pathname === '/auth/callback'
+      const query = new URLSearchParams(window.location.search)
+      const hash = new URLSearchParams(window.location.hash.replace(/^#/, ''))
+      const hasProviderError = query.has('error') || hash.has('error')
+      try {
+        if (isAuthCallback) {
+          // Supabase detects the PKCE code and exchanges it during initialize()
+          // because detectSessionInUrl is enabled in the client configuration.
+          const { error: callbackError } = await supabase.auth.initialize()
+          if (callbackError || hasProviderError) {
+            if (active) setError('GitHub sign-in could not be completed. Check the Supabase GitHub provider settings and try again.')
+          }
+        }
+        const { data, error: sessionError } = await supabase.auth.getSession()
+        if (sessionError) throw sessionError
+        if (active) {
+          setSession(data.session)
+          if (isAuthCallback) {
+            if (data.session) window.history.replaceState({}, '', '/')
+            else setError('GitHub did not return a PATCHWORK session. Please try signing in again.')
+          }
+        }
+      } catch {
+        if (active) setError('Could not restore your PATCHWORK session. Please try signing in again.')
+      } finally {
+        if (active) setAuthLoading(false)
+      }
+    })()
+    return () => { active = false; subscription.unsubscribe() }
   }, [])
 
   const loadRepositories = useCallback(async (page = 1, append = false) => {

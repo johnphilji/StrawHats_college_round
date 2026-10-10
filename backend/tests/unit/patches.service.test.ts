@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 vi.mock('../../src/lib/prisma', () => ({ isPrismaConfigured: vi.fn(() => true) }));
 vi.mock('../../src/modules/patches/patches.repository', () => ({
   patchesRepository: {
-    findOwnedProject: vi.fn(), create: vi.fn(), list: vi.fn(), findById: vi.fn(), updateStatus: vi.fn(),
+    findOwnedProject: vi.fn(), create: vi.fn(), list: vi.fn(), findById: vi.fn(), listHistory: vi.fn(), updateStatus: vi.fn(),
   },
 }));
 
@@ -50,5 +50,29 @@ describe('patchesService', () => {
     vi.mocked(patchesRepository.updateStatus).mockResolvedValue(row({ status: 'GENERATING' }) as never);
     await expect(patchesService.updateStatus('project-1', 'patch-1', 'user-1', 'GENERATING')).resolves.toMatchObject({ status: 'GENERATING' });
     await expect(patchesService.updateStatus('project-1', 'patch-1', 'user-1', 'APPROVED')).rejects.toMatchObject({ statusCode: 409, code: 'CONFLICT' });
+  });
+
+  it('returns paginated patch activity with a safe metadata allowlist', async () => {
+    vi.mocked(patchesRepository.findById).mockResolvedValue(row() as never);
+    vi.mocked(patchesRepository.listHistory).mockResolvedValue([
+      { id: 'event-1', action: 'PATCH_GENERATED', message: 'Generation completed', createdAt: new Date(), metadata: { generationId: 'attempt-1', headCommitSha: 'abc', errorSummary: 'do not expose', token: 'private' } },
+      { id: 'event-2', action: 'PATCH_CREATED', message: 'Patch created', createdAt: new Date(), metadata: null },
+      { id: 'event-3', action: 'PATCH_APPROVED', message: 'Patch approved', createdAt: new Date(), metadata: null },
+    ] as never);
+
+    const result = await patchesService.history('project-1', 'patch-1', 'user-1', 2, 2);
+    expect(patchesRepository.listHistory).toHaveBeenCalledWith('project-1', 'patch-1', 2, 3);
+    expect(result).toMatchObject({ page: 2, limit: 2, hasMore: true });
+    expect(result.items[0].metadata).toEqual({ generationId: 'attempt-1', headCommitSha: 'abc' });
+    expect(JSON.stringify(result)).not.toContain('do not expose');
+    expect(JSON.stringify(result)).not.toContain('private');
+  });
+
+  it('does not return history for a missing or unowned patch', async () => {
+    vi.mocked(patchesRepository.findById).mockResolvedValue(null);
+    await expect(patchesService.history('project-1', 'missing', 'user-1', 1, 20)).rejects.toMatchObject({ statusCode: 404 });
+    vi.mocked(patchesRepository.findOwnedProject).mockResolvedValue(null);
+    await expect(patchesService.history('other-project', 'patch-1', 'user-1', 1, 20)).rejects.toMatchObject({ statusCode: 404 });
+    expect(patchesRepository.listHistory).not.toHaveBeenCalled();
   });
 });

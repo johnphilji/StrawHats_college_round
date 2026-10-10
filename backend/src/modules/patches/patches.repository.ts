@@ -54,6 +54,16 @@ export const patchesRepository = {
     }) as Promise<PatchRecord | null>;
   },
 
+  async listHistory(projectId: string, patchId: string, skip: number, take: number) {
+    return getPrisma().auditLog.findMany({
+      where: { projectId, patchId },
+      orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+      skip,
+      take,
+      select: { id: true, action: true, message: true, metadata: true, createdAt: true },
+    });
+  },
+
   async updateStatus(
     patch: PatchRecord,
     status: string,

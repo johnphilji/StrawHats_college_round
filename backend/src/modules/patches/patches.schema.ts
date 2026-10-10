@@ -22,3 +22,8 @@ export const updatePatchStatusSchema = z.object({
   params: patchParamsSchema,
   query: z.object({}).passthrough().optional(),
 });
+
+export const patchHistoryQuerySchema = z.object({
+  page: z.coerce.number().int().min(1).max(100_000).default(1),
+  limit: z.coerce.number().int().min(1).max(100).default(20),
+});

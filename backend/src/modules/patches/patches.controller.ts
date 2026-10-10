@@ -1,6 +1,8 @@
 import type { Request, Response } from 'express';
 import { patchesService } from './patches.service';
 import type { PatchStatus, PatchRecord, PublicPatch } from './patches.types';
+import { patchHistoryQuerySchema } from './patches.schema';
+import { badRequest } from '../../shared/errors/AppError';
 
 function publicPatch(patch: PatchRecord): PublicPatch {
   const { validationDetails: _validationDetails, ...safePatch } = patch;
@@ -29,6 +31,19 @@ export const patchesController = {
       req.user!.id,
     );
     res.status(200).json({ success: true, data: publicPatch(patch) });
+  },
+
+  async history(req: Request, res: Response) {
+    const query = patchHistoryQuerySchema.safeParse(req.query);
+    if (!query.success) throw badRequest('History pagination parameters are invalid.');
+    const history = await patchesService.history(
+      req.params.projectId as string,
+      req.params.patchId as string,
+      req.user!.id,
+      query.data.page,
+      query.data.limit,
+    );
+    res.status(200).json({ success: true, data: history });
   },
 
   async updateStatus(req: Request, res: Response) {

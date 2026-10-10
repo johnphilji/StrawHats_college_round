@@ -4,12 +4,13 @@ PATCHWORK login uses Supabase Auth's GitHub OAuth provider. Repository access is
 
 ## Configure Supabase
 
-1. In Supabase Authentication > Providers, enable GitHub and configure a GitHub OAuth App client ID and secret for login.
-2. Add `http://localhost:5173/auth/callback` to the Supabase redirect URL allow list (and the production frontend callback URL).
-3. Set `VITE_SUPABASE_URL` and `VITE_SUPABASE_PUBLISHABLE_KEY` in `frontend/.env`.
-4. Set `SUPABASE_URL`, `SUPABASE_PUBLISHABLE_KEY`, and the server only `SUPABASE_SECRET_KEY` in `backend/.env`. The secret key is used only to bind an installation to the Supabase user who started setup.
+1. Create or open the **GitHub OAuth App** used for PATCHWORK login in GitHub **Settings > Developer settings > OAuth Apps**. Its **Authorization callback URL** must be the Supabase callback URL shown in the Supabase GitHub provider settings (normally `https://<project-ref>.supabase.co/auth/v1/callback`). This callback returns to Supabase, not directly to the frontend.
+2. In Supabase **Authentication > Sign In / Providers > GitHub**, enable GitHub and enter that OAuth App's actual **Client ID** and **Client Secret**. The Client ID is the value GitHub labels Client ID; an app name or description is not a Client ID.
+3. In Supabase **Authentication > URL Configuration**, set the local Site URL to `http://localhost:5173` and add `http://localhost:5173/auth/callback` to the allowed redirect URLs (plus the production frontend callback URL when deployed).
+4. Set `VITE_SUPABASE_URL` and `VITE_SUPABASE_PUBLISHABLE_KEY` in `frontend/.env`. These are from the Supabase project API settings; the publishable key is not the GitHub OAuth Client ID.
+5. Set `SUPABASE_URL`, `SUPABASE_PUBLISHABLE_KEY`, and server-only `SUPABASE_SECRET_KEY` in `backend/.env`. Never put the Supabase secret/service-role key or GitHub App private key in frontend variables.
 
-The GitHub OAuth App above handles PATCHWORK login only. Do not request repository scopes from that OAuth App.
+The GitHub OAuth App above handles PATCHWORK login only. PATCHWORK calls Supabase `signInWithOAuth({ provider: 'github' })`; the frontend does not construct GitHub authorization URLs or supply a GitHub Client ID. Do not request repository scopes from that OAuth App. Repository access is granted separately by installing the PATCHWORK GitHub App below.
 
 ## Configure a GitHub App
 
