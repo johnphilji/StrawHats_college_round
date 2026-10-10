@@ -1,3 +1,22 @@
+export interface ConnectedWebsite {
+  id: string;
+  name: string;
+  tagline: string;
+  repoUrl: string;
+  repoOwner: string;
+  repoName: string;
+  subpath?: string;
+  branch: string;
+  previewUrl: string;
+  productionUrl: string;
+  status: 'connected' | 'syncing' | 'error';
+  lastModified: string;
+  componentCount: number;
+  category: 'Ecommerce' | 'SaaS' | 'Docs' | 'Portfolio';
+  icon: string;
+  framework: string;
+}
+
 export interface Component {
   id: string;
   label: string;
@@ -5,9 +24,12 @@ export interface Component {
   html: string;
   css: string;
   editable: string[];
+  sourceFile?: string;
+  lineRange?: string;
 }
 
 export interface EditRequest {
+  websiteId: string;
   componentId: string;
   instruction: string;
 }
@@ -20,6 +42,8 @@ export interface EditResponse {
   commitSha: string;
   previewUrl?: string;
   validationPassed?: boolean;
+  modifiedFiles?: string[];
+  explanation?: string;
 }
 
 export type EditStatus =
@@ -36,6 +60,7 @@ export type EditStatus =
 
 export interface HistoryEntry {
   editId: string;
+  websiteId?: string;
   componentId: string;
   label: string;
   instruction: string;
@@ -48,8 +73,11 @@ export interface HistoryEntry {
 
 export interface SelectedComponent {
   componentId: string;
+  label: string;
   tagName: string;
   text: string;
+  sourceFile: string;
+  lineRange: string;
   styles: {
     color: string;
     backgroundColor: string;
@@ -60,5 +88,5 @@ export interface SelectedComponent {
     borderRadius: string;
     display: string;
   };
-  rect: { x: number; y: number; width: number; height: number };
+  rect?: { x: number; y: number; width: number; height: number };
 }

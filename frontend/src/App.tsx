@@ -5,19 +5,32 @@ import PreviewPane from './PreviewPane';
 import Inspector from './Inspector';
 import HistoryView from './HistoryView';
 import DeployView from './DeployView';
-import type { SelectedComponent } from './types';
+import WebsitesView from './WebsitesView';
+import { MOCK_WEBSITES } from './api';
+import type { SelectedComponent, ConnectedWebsite } from './types';
 
 export default function App() {
-  const [activeView, setActiveView]   = useState<string>('editor');
-  const [selected, setSelected]       = useState<SelectedComponent | null>(null);
-  const [editMode, setEditMode]       = useState(false);
+  const [activeView, setActiveView]         = useState<string>('websites');
+  const [currentWebsite, setCurrentWebsite] = useState<ConnectedWebsite>(MOCK_WEBSITES[0]);
+  const [selected, setSelected]             = useState<SelectedComponent | null>(null);
+  const [editMode, setEditMode]             = useState(true);
 
-  const handleSelect = useCallback((component: SelectedComponent) => {
+  const handleSelectWebsite = useCallback((site: ConnectedWebsite) => {
+    setCurrentWebsite(site);
+    setActiveView('editor');
+    setSelected(null);
+  }, []);
+
+  const handleSelectComponent = useCallback((component: SelectedComponent) => {
     setSelected(component);
   }, []);
 
-  const handleClear = useCallback(() => {
+  const handleClearSelection = useCallback(() => {
     setSelected(null);
+  }, []);
+
+  const toggleEditMode = useCallback(() => {
+    setEditMode(prev => !prev);
   }, []);
 
   return (
@@ -26,73 +39,70 @@ export default function App() {
       <div className="topbar">
         <div className="topbar-left">
           <div className="breadcrumb">
-            <span className="breadcrumb-seg">StrawHats</span>
+            <span className="breadcrumb-seg" onClick={() => setActiveView('websites')}>PATCHWORK</span>
             <span className="breadcrumb-sep">/</span>
-            <span className="breadcrumb-seg">Acme Store</span>
+            <span className="breadcrumb-seg" onClick={() => setActiveView('websites')}>
+              {currentWebsite.name}
+            </span>
             <span className="breadcrumb-sep">/</span>
-            <span className="breadcrumb-seg breadcrumb-active">Visual Editor</span>
+            <span className="breadcrumb-active">
+              {activeView === 'websites' ? 'Connected Sites' : activeView === 'editor' ? 'Visual Editor' : activeView === 'history' ? 'History' : 'Deployments'}
+            </span>
           </div>
-        </div>
 
-        <div className="topbar-center">
-          {activeView === 'editor' && (
-            <div className="mode-toggle">
-              <button
-                className={`mode-btn ${!editMode ? 'mode-btn-active' : ''}`}
-                onClick={() => setEditMode(false)}
-              >
-                View
-              </button>
-              <button
-                className={`mode-btn ${editMode ? 'mode-btn-active' : ''}`}
-                onClick={() => setEditMode(true)}
-              >
-                ✦ Edit
-              </button>
-            </div>
+          {activeView !== 'websites' && (
+            <button className="site-dropdown" onClick={() => setActiveView('websites')}>
+              <span>⇄</span> Switch Website
+            </button>
           )}
         </div>
 
         <div className="topbar-right">
+          <div className="repo-pill">
+            <span>📦</span>
+            <span>{currentWebsite.repoOwner}/{currentWebsite.repoName}</span>
+            <span style={{ color: '#64748b' }}>•</span>
+            <span>⎇ {currentWebsite.branch}</span>
+          </div>
+
           <div className="topbar-badge">
             <span className="badge-dot" />
-            <span>demo-v1</span>
+            <span>Git Bridge Online</span>
           </div>
-          <div className="avatar">JS</div>
         </div>
       </div>
 
+      {/* Main Workspace Layout */}
       <div className="workspace">
-        <Sidebar activeView={activeView} onViewChange={setActiveView} />
+        <Sidebar
+          activeView={activeView}
+          onViewChange={setActiveView}
+          website={currentWebsite}
+        />
 
-        {/* Main content area */}
-        <div className="main-area">
+        <div className="main-content">
+          {activeView === 'websites' && (
+            <WebsitesView onSelectWebsite={handleSelectWebsite} />
+          )}
+
           {activeView === 'editor' && (
-            <div className="editor-layout">
+            <>
               <PreviewPane
                 selectedId={selected?.componentId ?? null}
-                onSelect={handleSelect}
+                onSelect={handleSelectComponent}
                 editMode={editMode}
+                website={currentWebsite}
+                onToggleEditMode={toggleEditMode}
               />
-              <Inspector selected={selected} onClear={handleClear} />
-            </div>
+              <Inspector
+                selected={selected}
+                onClear={handleClearSelection}
+              />
+            </>
           )}
 
-          {activeView === 'history' && (
-            <HistoryView />
-          )}
-
-          {activeView === 'deploy' && (
-            <DeployView />
-          )}
-
-          {activeView === 'settings' && (
-            <div className="settings-placeholder">
-              <div className="placeholder-icon">⚙</div>
-              <div className="placeholder-title">Settings</div>
-              <div className="placeholder-text">Project settings, API keys, and team configuration will live here.</div>
-            </div>
-          )}
+          {activeView === 'history' && <HistoryView />}
+          {activeView === 'deploy' && <DeployView />}
         </div>
       </div>
     </div>

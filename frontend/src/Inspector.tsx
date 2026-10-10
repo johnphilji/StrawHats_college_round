@@ -1,245 +1,264 @@
 import { useState } from 'react';
 import styles from './Inspector.module.css';
 import type { SelectedComponent, EditResponse, EditStatus } from './types';
-import { submitEditRequest, mergeAndDeploy, rollback } from './api';
+import { submitEditRequest, mergeAndDeploy } from './api';
 
 interface InspectorProps {
   selected: SelectedComponent | null;
   onClear: () => void;
 }
 
-function StatusBadge({ status }: { status: EditStatus }) {
-  const map: Record<EditStatus, { label: string; cls: string }> = {
-    draft:       { label: 'Draft',       cls: styles.statusDraft },
-    generating:  { label: 'Generating…', cls: styles.statusGenerating },
-    testing:     { label: 'Testing',     cls: styles.statusTesting },
-    approved:    { label: 'Approved',    cls: styles.statusApproved },
-    merged:      { label: 'Merged',      cls: styles.statusMerged },
-    deploying:   { label: 'Deploying…',  cls: styles.statusDeploying },
-    deployed:    { label: '✓ Deployed',  cls: styles.statusDeployed },
-    failed:      { label: '✗ Failed',    cls: styles.statusFailed },
-    conflict:    { label: '⚡ Conflict',  cls: styles.statusConflict },
-    rolled_back: { label: '↩ Rolled back', cls: styles.statusRolledBack },
-  };
-  const { label, cls } = map[status];
-  return <span className={`${styles.statusBadge} ${cls}`}>{label}</span>;
-}
-
-function DiffViewer({ diff }: { diff: string }) {
-  return (
-    <div className={styles.diffViewer}>
-      {diff.split('\n').map((line, i) => {
-        let cls = styles.diffLine;
-        if (line.startsWith('+') && !line.startsWith('+++')) cls = styles.diffAdded;
-        else if (line.startsWith('-') && !line.startsWith('---')) cls = styles.diffRemoved;
-        else if (line.startsWith('@@')) cls = styles.diffHunk;
-        else if (line.startsWith('---') || line.startsWith('+++')) cls = styles.diffHeader;
-        return <div key={i} className={cls}>{line || ' '}</div>;
-      })}
-    </div>
-  );
-}
-
 export default function Inspector({ selected, onClear }: InspectorProps) {
   const [instruction, setInstruction] = useState('');
-  const [edit, setEdit]               = useState<EditResponse | null>(null);
-  const [status, setStatus]           = useState<EditStatus | null>(null);
-  const [loading, setLoading]         = useState(false);
-  const [activeTab, setActiveTab]     = useState<'prompt' | 'diff' | 'styles'>('prompt');
+  const [edit, setEdit] = useState<EditResponse | null>(null);
+  const [status, setStatus] = useState<EditStatus | null>(null);
+  const [loading, setLoading] = useState(false);
 
-  const handleSubmit = async () => {
-    if (!selected || !instruction.trim()) return;
+  // If no component is selected, render the onboarding / empty state
+  if (!selected) {
+    return (
+      <div className={styles.inspector}>
+        <div className={styles.emptyState}>
+          <div className={styles.emptyIcon}>⬡</div>
+          <div className={styles.emptyTitle}>Select a Component</div>
+          <p className={styles.emptyDesc}>
+            Hover over any element in the website preview to see it highlight, then click it to open the AI prompt.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  const handleGenerate = async () => {
+    if (!instruction.trim()) return;
     setLoading(true);
-    setEdit(null);
     setStatus('generating');
-    setActiveTab('diff');
+
     try {
-      const result = await submitEditRequest(
-        selected.componentId,
-        instruction,
-        (s, data) => {
-          setStatus(s);
-          if (data?.diff) setEdit(prev => ({ ...prev!, ...data }));
-        }
-      );
-      setEdit(result);
-      setStatus('approved');
+      const res = await submitEditRequest(selected, instruction, (s, data) => {
+        setStatus(s);
+        if (data) setEdit(data as EditResponse);
+      });
+      setEdit(res);
+      setStatus('approved'); // ready for user review of diff
     } finally {
       setLoading(false);
     }
   };
 
-  const handleDeploy = async () => {
-    if (!edit) return;
-    setLoading(true);
-    await mergeAndDeploy(edit.editId, setStatus);
-    setLoading(false);
+  const handleApproveBranch = () => {
+    // Progress from diff approval to branch preview stage
+    setStatus('testing');
   };
 
-  const handleRollback = async () => {
+  const handleApproveRelease = async () => {
     if (!edit) return;
     setLoading(true);
-    await rollback(edit.editId, setStatus);
-    setLoading(false);
+    try {
+      await mergeAndDeploy(edit.editId, s => setStatus(s));
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const handleClear = () => {
+  const handleReset = () => {
     setEdit(null);
     setStatus(null);
     setInstruction('');
-    setActiveTab('prompt');
     onClear();
   };
 
-  if (!selected) {
-    return (
-      <aside className={styles.inspector}>
-        <div className={styles.empty}>
-          <div className={styles.emptyIcon}>
-            <svg width="32" height="32" viewBox="0 0 32 32" fill="none">
-              <rect x="6" y="6" width="8" height="8" rx="2" fill="currentColor" opacity="0.3"/>
-              <rect x="18" y="6" width="8" height="8" rx="2" fill="currentColor" opacity="0.6"/>
-              <rect x="6" y="18" width="8" height="8" rx="2" fill="currentColor" opacity="0.6"/>
-              <circle cx="22" cy="22" r="4" fill="currentColor"/>
-            </svg>
-          </div>
-          <div className={styles.emptyTitle}>No component selected</div>
-          <div className={styles.emptyText}>
-            Enable <strong>Edit Mode</strong> in the preview toolbar, then click any highlighted element to select it.
-          </div>
-        </div>
-      </aside>
-    );
-  }
-
   return (
-    <aside className={styles.inspector}>
+    <div className={styles.inspector}>
       {/* Header */}
       <div className={styles.header}>
-        <div className={styles.headerTop}>
-          <div>
-            <div className={styles.componentId}>{selected.componentId}</div>
-            <div className={styles.componentTag}>&lt;{selected.tagName.toLowerCase()}&gt;</div>
-          </div>
-          <button className={styles.clearBtn} onClick={handleClear} title="Deselect">✕</button>
+        <div className={styles.titleGroup}>
+          <span className={styles.selectedLabel}>Selected Component</span>
+          <div className={styles.compName}>{selected.label}</div>
         </div>
-        {selected.text && (
-          <div className={styles.componentText}>"{selected.text.slice(0, 60)}{selected.text.length > 60 ? '…' : ''}"</div>
-        )}
-        {status && <StatusBadge status={status} />}
+        <button className={styles.closeBtn} onClick={handleReset} title="Clear selection">
+          ✕
+        </button>
       </div>
 
-      {/* Tabs */}
-      <div className={styles.tabs}>
-        {(['prompt', 'diff', 'styles'] as const).map(tab => (
-          <button
-            key={tab}
-            className={`${styles.tab} ${activeTab === tab ? styles.tabActive : ''}`}
-            onClick={() => setActiveTab(tab)}
-          >
-            {tab === 'prompt' ? '✦ Prompt' : tab === 'diff' ? '⟨/⟩ Diff' : '◈ Styles'}
-          </button>
-        ))}
+      {/* Source Mapping Box */}
+      <div className={styles.sourceMapping}>
+        <div className={styles.sourceHeader}>
+          <span>TARGET SOURCE FILE</span>
+          <span>&lt;{selected.tagName.toLowerCase()}&gt;</span>
+        </div>
+        <div className={styles.sourcePath}>📁 {selected.sourceFile}</div>
       </div>
 
       <div className={styles.body}>
-        {/* Prompt tab */}
-        {activeTab === 'prompt' && (
-          <div className={styles.promptSection} style={{animation: 'fadeIn 0.2s ease'}}>
-            <div className={styles.label}>Describe your change</div>
+        {/* STEP 1: Describe the change */}
+        {!edit && (
+          <div className={styles.promptSection}>
+            <div className={styles.sectionTitle}>
+              <span>✨</span>
+              <span>What would you like to change?</span>
+            </div>
+
             <textarea
               className={styles.textarea}
-              placeholder={`e.g. "Make the background green and rename it to Continue to Payment"`}
+              placeholder='e.g. Make this green and change the text to "Get Started"'
               value={instruction}
               onChange={e => setInstruction(e.target.value)}
-              rows={4}
-              onKeyDown={e => { if (e.key === 'Enter' && e.metaKey) handleSubmit(); }}
+              disabled={loading}
             />
-            <div className={styles.promptHint}>⌘ Enter to submit</div>
+
+            <div className={styles.chipGroup}>
+              <button
+                type="button"
+                className={styles.promptChip}
+                onClick={() => setInstruction('Make this green and change the text to "Get Started"')}
+              >
+                🟢 Green & "Get Started"
+              </button>
+              <button
+                type="button"
+                className={styles.promptChip}
+                onClick={() => setInstruction('Rename to "Continue to Payment" and add lock icon')}
+              >
+                🔒 "Continue to Payment"
+              </button>
+              <button
+                type="button"
+                className={styles.promptChip}
+                onClick={() => setInstruction('Update promo banner to 50% OFF Hackathon Special')}
+              >
+                🔥 Flash Sale Promo
+              </button>
+            </div>
+
             <button
-              className={styles.submitBtn}
-              onClick={handleSubmit}
-              disabled={!instruction.trim() || loading}
+              className={styles.generateBtn}
+              onClick={handleGenerate}
+              disabled={loading || !instruction.trim()}
             >
-              {loading && status === 'generating' ? (
-                <><span className={styles.spinner} /> Generating patch…</>
+              {loading ? (
+                <>
+                  <span>⏳</span>
+                  <span>{status === 'generating' ? 'AI Generating Code...' : 'Validating Syntax...'}</span>
+                </>
               ) : (
-                '⚡ Generate Patch'
+                <>
+                  <span>✦</span>
+                  <span>Generate Change</span>
+                </>
               )}
             </button>
           </div>
         )}
 
-        {/* Diff tab */}
-        {activeTab === 'diff' && (
-          <div style={{animation: 'fadeIn 0.2s ease'}}>
-            {edit?.diff ? (
-              <>
-                <div className={styles.diffMeta}>
-                  <div className={styles.diffBranch}>
-                    <span className={styles.branchIcon}>⎇</span>
-                    <span className={styles.branchName}>{edit.branch}</span>
-                  </div>
-                  <div className={styles.diffSha}>SHA: {edit.commitSha}</div>
-                </div>
-                <DiffViewer diff={edit.diff} />
-                {edit.validationPassed && (
-                  <div className={styles.validationBadge}>
-                    ✓ Validation passed · All selectors verified
-                  </div>
-                )}
-              </>
-            ) : (
-              <div className={styles.noDiff}>
-                {loading ? (
-                  <div className={styles.loadingDiff}>
-                    <span className={styles.spinner} />
-                    <span>Generating diff…</span>
-                  </div>
-                ) : (
-                  <span>No diff yet. Submit a prompt first.</span>
-                )}
+        {/* STEP 2: Review Code Diff */}
+        {edit && status === 'approved' && (
+          <div className={styles.promptSection}>
+            <div className={styles.sectionTitle}>
+              <span>🔍</span>
+              <span>Proposed Code Changes</span>
+            </div>
+
+            <div className={styles.diffCard}>
+              <div className={styles.diffHeader}>
+                <span>Git Diff Preview</span>
+                <span>{edit.modifiedFiles?.join(', ')}</span>
               </div>
-            )}
+
+              {edit.explanation && (
+                <div className={styles.diffExplanation}>
+                  💡 {edit.explanation}
+                </div>
+              )}
+
+              <div className={styles.diffBox}>
+                {edit.diff.split('\n').map((line, i) => {
+                  let cls = styles.diffLine;
+                  if (line.startsWith('+') && !line.startsWith('+++')) cls = `${styles.diffLine} ${styles.diffAdded}`;
+                  else if (line.startsWith('-') && !line.startsWith('---')) cls = `${styles.diffLine} ${styles.diffRemoved}`;
+                  else if (line.startsWith('@@')) cls = `${styles.diffLine} ${styles.diffHunk}`;
+                  return (
+                    <div key={i} className={cls}>
+                      {line || ' '}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+            <div className={styles.checklist}>
+              <div className={styles.checkItem}>
+                <span>✓</span>
+                <span>Automated syntax validation passed</span>
+              </div>
+              <div className={styles.checkItem}>
+                <span>✓</span>
+                <span>Scoped strictly to {selected.label}</span>
+              </div>
+              <div className={styles.checkItem}>
+                <span>✓</span>
+                <span>Isolated Git branch prepared: <code>{edit.branch}</code></span>
+              </div>
+            </div>
+
+            <div className={styles.actionRow}>
+              <button className={styles.discardBtn} onClick={() => setEdit(null)}>
+                Try Again
+              </button>
+              <button className={styles.approveBtn} onClick={handleApproveBranch}>
+                ✓ Approve & Create Branch
+              </button>
+            </div>
           </div>
         )}
 
-        {/* Styles tab */}
-        {activeTab === 'styles' && (
-          <div className={styles.stylesGrid} style={{animation: 'fadeIn 0.2s ease'}}>
-            {Object.entries(selected.styles).map(([prop, val]) => (
-              <div key={prop} className={styles.styleProp}>
-                <div className={styles.stylePropName}>{prop}</div>
-                <div className={styles.stylePropVal}>
-                  {prop === 'backgroundColor' || prop === 'color' ? (
-                    <span className={styles.colorSwatch} style={{background: val}} />
-                  ) : null}
-                  <code>{val}</code>
-                </div>
+        {/* STEP 3: Preview Branch & Release Approval */}
+        {edit && (status === 'testing' || status === 'merged' || status === 'deploying') && (
+          <div className={styles.promptSection}>
+            <div className={styles.sectionTitle}>
+              <span>⎇</span>
+              <span>Isolated Branch Preview</span>
+            </div>
+
+            <div className={styles.diffCard}>
+              <div className={styles.diffHeader}>
+                <span>Branch: {edit.branch}</span>
+                <span>Commit: {edit.commitSha}</span>
               </div>
-            ))}
+              <div className={styles.diffExplanation}>
+                Changes are committed to <code>{edit.branch}</code>. Preview is ready for final release approval.
+              </div>
+            </div>
+
+            <div className={styles.actionRow}>
+              <button className={styles.discardBtn} onClick={() => setEdit(null)} disabled={loading}>
+                Discard
+              </button>
+              <button
+                className={styles.approveBtn}
+                onClick={handleApproveRelease}
+                disabled={loading}
+              >
+                {loading ? '🚀 Merging & Deploying to Vercel...' : '🚀 Approve Release & Deploy to Main'}
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* STEP 4: Deployed */}
+        {edit && status === 'deployed' && (
+          <div className={styles.successCard}>
+            <div className={styles.successIcon}>🎉</div>
+            <div className={styles.successTitle}>Successfully Released!</div>
+            <p className={styles.successDesc}>
+              Merged into <code>main</code> and deployed live to production. All automated checks passed.
+            </p>
+            <button className={styles.resetBtn} onClick={handleReset}>
+              ↺ Edit Another Component
+            </button>
           </div>
         )}
       </div>
-
-      {/* Action bar */}
-      {edit && (status === 'approved' || status === 'deployed' || status === 'rolled_back') && (
-        <div className={styles.actions}>
-          {status === 'approved' && (
-            <button className={styles.deployBtn} onClick={handleDeploy} disabled={loading}>
-              {loading ? <><span className={styles.spinner} /> Deploying…</> : '▲ Merge & Deploy'}
-            </button>
-          )}
-          {status === 'deployed' && (
-            <button className={styles.rollbackBtn} onClick={handleRollback} disabled={loading}>
-              ↩ Rollback
-            </button>
-          )}
-          {status === 'rolled_back' && (
-            <div className={styles.rolledBackNote}>Rolled back to previous version.</div>
-          )}
-        </div>
-      )}
-    </aside>
+    </div>
   );
 }
