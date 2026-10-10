@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import styles from './Inspector.module.css';
 import type { SelectedComponent, EditResponse, EditStatus } from './types';
 import { submitEditRequest, mergeAndDeploy, rollback } from './api';

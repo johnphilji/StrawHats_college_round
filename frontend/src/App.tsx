@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import { useState, useCallback } from 'react';
 import './App.css';
 import Sidebar from './Sidebar';
 import PreviewPane from './PreviewPane';

@@ -1,4 +1,4 @@
-import React, { useRef, useEffect, useCallback } from 'react';
+import { useRef, useEffect, useCallback } from 'react';
 import type { SelectedComponent } from './types';
 import styles from './PreviewPane.module.css';
 

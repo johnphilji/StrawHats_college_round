@@ -86,7 +86,7 @@ export async function submitEditRequest(
 }
 
 export async function mergeAndDeploy(
-  editId: string,
+  _editId: string,
   onStatusChange: (status: EditStatus) => void
 ): Promise<void> {
   onStatusChange('merged');

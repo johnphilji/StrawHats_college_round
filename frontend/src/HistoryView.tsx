@@ -1,4 +1,3 @@
-import React from 'react';
 import styles from './HistoryView.module.css';
 import type { HistoryEntry, EditStatus } from './types';
 import { MOCK_HISTORY } from './api';
