@@ -24,6 +24,9 @@ const envSchema = z.object({
   SUPABASE_SERVICE_ROLE_KEY: optionalStringSchema,
   LOG_LEVEL: z.enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace', 'silent']).default('info'),
   TARGET_REPOSITORY_PATH: optionalStringSchema,
+  GITHUB_APP_ID: optionalStringSchema,
+  GITHUB_APP_SLUG: optionalStringSchema,
+  GITHUB_APP_PRIVATE_KEY: optionalStringSchema,
 });
 
 export type Env = z.infer<typeof envSchema>;

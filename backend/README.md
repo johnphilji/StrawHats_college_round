@@ -27,8 +27,8 @@ See root `README.md` for the full PATCHWORK plan.
 ## Scripts
 
 - `npm run dev` – tsx watch
-- `npm run build` – tsc
-- `npm start` – node dist/server.js
+- `npm run build` – generate the Prisma client and compile the backend plus client
+- `npm start` – node dist/src/server.js
 - `npm run typecheck` – tsc --noEmit
 - `npm test` – vitest
 - `npm run test:watch` – vitest --watch
