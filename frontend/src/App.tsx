@@ -47,9 +47,12 @@ export default function App() {
   const [repositories, setRepositories]               = useState<Repository[]>([]);
   const [hasMoreRepositories, setHasMoreRepositories] = useState(false);
   const [selectedRepo, setSelectedRepo]               = useState<Repository | null>(null);
+  const [installation, setInstallation]               = useState<{ connected: boolean; installationId?: number } | null>(null);
+  const [configIssue, setConfigIssue]                 = useState(false);
   const [filePath, setFilePath]                       = useState('');
   const [ref, setRef]                                 = useState('');
   const [source, setSource]                           = useState<Source | null>(null);
+  const [patchworkSupport, setPatchworkSupport]       = useState<{ supported: boolean; reason?: string; componentCount?: number } | null>(null);
   const [loading, setLoading]                         = useState(false);
   const [error, setError]                             = useState('');
   const [notice, setNotice]                           = useState('');
@@ -88,10 +91,18 @@ export default function App() {
         ...init.headers,
       },
     });
-    const body = (await response.json()) as { success: boolean; data?: T; error?: { message?: string } };
-    if (!response.ok || !body.success) throw new Error(body.error?.message || 'The request could not be completed.');
+    const body = (await response.json()) as { success: boolean; data?: T; error?: { code?: string; message?: string } };
+    if (!response.ok || !body.success) {
+      const failure = new Error(body.error?.message || 'The request could not be completed.');
+      (failure as Error & { code?: string }).code = body.error?.code;
+      throw failure;
+    }
     return body.data as T;
   }, [session]);
+
+  const isConfigError = useCallback((err: unknown) => {
+    return err instanceof Error && (err as Error & { code?: string }).code === 'CONFIGURATION_ERROR';
+  }, []);
 
   useEffect(() => {
     if (!supabase) return;
@@ -114,12 +125,28 @@ export default function App() {
       );
       setRepositories(current => (append ? [...current, ...result.repositories] : result.repositories));
       setHasMoreRepositories(result.hasMore);
+      setConfigIssue(false);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Unable to load repositories.');
+      if (isConfigError(err)) setConfigIssue(true);
     } finally {
       setLoading(false);
     }
-  }, [request]);
+  }, [request, isConfigError]);
+
+  const loadInstallation = useCallback(async () => {
+    try {
+      const status = await request<{ connected: boolean; installationId?: number }>('/github/installation');
+      setInstallation(status);
+      if (status.connected) setConfigIssue(false);
+    } catch (err) {
+      setInstallation(null);
+      if (isConfigError(err)) {
+        setConfigIssue(true);
+        setError(err instanceof Error ? err.message : 'Unable to check installation status.');
+      }
+    }
+  }, [request, isConfigError]);
 
   useEffect(() => {
     if (session) {
@@ -129,14 +156,21 @@ export default function App() {
         setActiveView('github');
         window.history.replaceState({}, '', '/');
       }
+      if (window.location.pathname.startsWith('/auth/callback')) {
+        window.history.replaceState({}, '', '/');
+      }
       void loadRepositories();
+      void loadInstallation();
     } else {
       setRepositories([]);
       setSelectedRepo(null);
       setSource(null);
+      setPatchworkSupport(null);
       setHasMoreRepositories(false);
+      setInstallation(null);
+      setConfigIssue(false);
     }
-  }, [session, loadRepositories]);
+  }, [session, loadRepositories, loadInstallation]);
 
   async function signIn() {
     if (!supabase) {
@@ -162,22 +196,33 @@ export default function App() {
 
   async function connectRepository() {
     setError('');
+    setConfigIssue(false);
     try {
       const result = await request<{ url: string }>('/github/installation/setup', { method: 'POST' });
       window.location.assign(result.url);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Unable to start GitHub App setup.');
+      if (isConfigError(err)) setConfigIssue(true);
     }
   }
 
   async function selectRepository(repository: Repository) {
     setSelectedRepo(repository);
     setSource(null);
+    setPatchworkSupport(null);
     setError('');
     try {
       setSelectedRepo(await request<Repository>(`/github/repositories/${repository.id}`));
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Unable to load repository metadata.');
+      return;
+    }
+    try {
+      setPatchworkSupport(await request<{ supported: boolean; reason?: string; componentCount?: number }>(
+        `/github/repositories/${repository.id}/patchwork`,
+      ));
+    } catch {
+      setPatchworkSupport(null);
     }
   }
 
@@ -366,10 +411,10 @@ export default function App() {
                     <div className="eyebrow">SOURCE CONTROL</div>
                     <h1>Build from your code.</h1>
                     <p>Sign in with PATCHWORK through Supabase, then connect a GitHub repository to retrieve source for your generation workflow.</p>
-                    <button className="primary github" disabled={!supabase} onClick={() => void signIn()}>
+                    <button className="primary github" disabled={loading} onClick={() => void signIn()}>
                       <span aria-hidden="true">◉</span> Continue with GitHub
                     </button>
-                    {!supabase && <small>Configure the Supabase frontend variables to enable sign in.</small>}
+                    {!supabase && <small>Configure the Supabase frontend variables in frontend/.env to enable sign in.</small>}
                     {error && <p className="error" role="alert">{error}</p>}
                   </section>
                 ) : (
@@ -391,14 +436,37 @@ export default function App() {
                     <div className="layout">
                       <section className="card repo-card">
                         <div className="section-heading">
-                          <div>
-                            <div className="eyebrow">GITHUB APP ACCESS</div>
-                            <h2>Repositories</h2>
+                            <div>
+                              <div className="eyebrow">GITHUB APP ACCESS</div>
+                              <h2>Repositories</h2>
+                            </div>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                              {installation?.connected ? (
+                                <span className="badge">Installed · #{installation.installationId}</span>
+                              ) : (
+                                <span className="badge">Not connected</span>
+                              )}
+                              <button className="quiet" onClick={() => { void loadRepositories(); void loadInstallation(); }}>
+                                Refresh
+                              </button>
+                            </div>
                           </div>
-                          <button className="quiet" onClick={() => void loadRepositories()}>
-                            Refresh
-                          </button>
-                        </div>
+                          {configIssue && (
+                            <div className="empty" role="alert">
+                              <span className="empty-icon">⚙</span>
+                              <h3>GitHub App integration is not configured</h3>
+                              <p>
+                                The backend needs its GitHub App credentials before repositories can load.
+                                Set <code>GITHUB_APP_ID</code>, <code>GITHUB_APP_SLUG</code>, and{' '}
+                                <code>GITHUB_APP_PRIVATE_KEY</code> in <code>backend/.env</code> (see{' '}
+                                <code>backend/.env.example</code> and <code>GITHUB_INTEGRATION.md</code> for the
+                                App permissions and Setup URL), then restart the backend and refresh.
+                              </p>
+                              <button className="outline" onClick={() => { void loadRepositories(); void loadInstallation(); }}>
+                                Retry after configuring
+                              </button>
+                            </div>
+                          )}
                         {loading && repositories.length === 0 ? (
                           <p className="muted">Loading repositories…</p>
                         ) : repositories.length ? (
@@ -448,6 +516,21 @@ export default function App() {
                         {selectedRepo ? (
                           <>
                             <p className="muted">Files are fetched individually and limited to 256 KB.</p>
+                            {patchworkSupport?.supported ? (
+                              <p className="notice">
+                                PATCHWORK-ready: manifest found ({patchworkSupport.componentCount} components). This
+                                repository can participate in the visual editing workflow.
+                              </p>
+                            ) : patchworkSupport && !patchworkSupport.supported ? (
+                              <p className="muted">
+                                Not PATCHWORK-ready ({patchworkSupport.reason === 'no-manifest'
+                                  ? 'no patchwork-registry.json at the repository root'
+                                  : patchworkSupport.reason === 'invalid-manifest'
+                                    ? 'patchwork-registry.json is invalid'
+                                    : 'manifest could not be read'}). Source retrieval below still works; visual
+                                editing requires the manifest.
+                              </p>
+                            ) : null}
                             <form onSubmit={retrieveSource}>
                               <label htmlFor="source-path">File path</label>
                               <input

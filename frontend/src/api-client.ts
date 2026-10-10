@@ -1,5 +1,17 @@
 import { API_BASE_URL } from './config';
 
+// The GitHub workspace view (App.tsx) historically uses VITE_API_URL, which
+// already includes the `/api` prefix, while this client was built around
+// VITE_API_BASE_URL without it. Accept both spellings so the two call sites
+// cannot drift: prefer VITE_API_URL, strip one trailing `/api`, and append
+// `/api/...` paths below.
+function resolveApiBase(): string {
+  const withPrefix = import.meta.env.VITE_API_URL as string | undefined;
+  if (withPrefix && withPrefix.trim()) return withPrefix.trim().replace(/\/+$/, '').replace(/\/api$/, '');
+  return API_BASE_URL;
+}
+
+const API_BASE = resolveApiBase();
 // Minimal typed client for the PATCHWORK backend (Phase 4).
 // Only endpoint used by the live editing flow; other views keep their
 // existing mock data until their backend integrations land.
@@ -53,12 +65,12 @@ export class ApiRequestError extends Error {
 async function requestJson<T>(path: string, init?: RequestInit): Promise<T> {
   let res: Response;
   try {
-    res = await fetch(`${API_BASE_URL}${path}`, {
+    res = await fetch(`${API_BASE}${path}`, {
       ...init,
       headers: { 'Content-Type': 'application/json', ...(init?.headers ?? {}) },
     });
   } catch {
-    throw new ApiRequestError(0, 'NETWORK_ERROR', `Cannot reach the PATCHWORK backend at ${API_BASE_URL}. Is it running (npm run dev:backend)?`);
+    throw new ApiRequestError(0, 'NETWORK_ERROR', `Cannot reach the PATCHWORK backend at ${API_BASE}. Is it running (npm run dev:backend)?`);
   }
   let body: unknown = null;
   try {

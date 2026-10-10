@@ -33,6 +33,10 @@ router.post('/installation/setup', asyncHandler(async (req, res) => {
   res.status(200).json({ success: true, data: { url: await githubAppService.createSetupUrl(req.user!.id) } });
 }));
 
+router.get('/installation', asyncHandler(async (req, res) => {
+  res.status(200).json({ success: true, data: await githubAppService.getInstallation(req.user!) });
+}));
+
 router.get('/repositories', asyncHandler(async (req, res) => {
   const query = repositoryListQuery.safeParse(req.query);
   if (!query.success) throw badRequest('Repository pagination parameters are invalid.');
@@ -48,6 +52,14 @@ router.get('/repositories/:repositoryId/source', asyncHandler(async (req, res) =
   const query = sourceQuery.safeParse(req.query);
   if (!query.success) throw badRequest('A source path and optional valid ref are required.');
   const data = await githubAppService.readSource(req.user!, req.params.repositoryId as string, query.data.path, query.data.ref);
+  res.status(200).json({ success: true, data });
+}));
+
+const patchworkQuery = z.object({ ref: z.string().max(255).optional() });
+router.get('/repositories/:repositoryId/patchwork', asyncHandler(async (req, res) => {
+  const query = patchworkQuery.safeParse(req.query);
+  if (!query.success) throw badRequest('Optional ref is invalid.');
+  const data = await githubAppService.checkPatchworkSupport(req.user!, req.params.repositoryId as string, query.data.ref);
   res.status(200).json({ success: true, data });
 }));
 

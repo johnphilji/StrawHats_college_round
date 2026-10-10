@@ -167,3 +167,48 @@ export function createDefaultRepositoryProvider(): LocalRepositoryProvider {
   validateRepositoryConfig(config);
   return new LocalRepositoryProvider(config.repositoryRoot);
 }
+
+/**
+ * Minimal content-reader surface used by {@link GithubRepositoryProvider}.
+ * Supplied by callers that already hold an authorized way to fetch file
+ * content (e.g. a verified GitHub App installation token flow). The provider
+ * itself never sees credentials or tokens.
+ */
+export type GithubContentReader = {
+  readContent(relativeFilePath: string): Promise<string>;
+  contentExists(relativeFilePath: string): Promise<boolean>;
+};
+
+/**
+ * GitHub-backed implementation of RepositoryProvider.
+ * Reads file content through an injected authorized reader (typically bound
+ * to one verified installation + repository + ref). Path/value validation
+ * still happens at the reader (GitHub contents API surface), and callers
+ * must only pass registry-derived paths, exactly as with the local provider.
+ * `getRepositoryRoot()` returns a synthetic `github:owner/name@ref` label
+ * (no caller uses it as a filesystem path).
+ */
+export class GithubRepositoryProvider implements RepositoryProvider {
+  private readonly label: string;
+  private readonly reader: GithubContentReader;
+
+  constructor(label: string, reader: GithubContentReader) {
+    if (!label || !label.trim()) {
+      throw new InvalidRepositoryConfigError('GitHub repository label is required.');
+    }
+    this.label = label.trim();
+    this.reader = reader;
+  }
+
+  public getRepositoryRoot(): string {
+    return this.label;
+  }
+
+  public async readFile(relativeFilePath: string): Promise<string> {
+    return this.reader.readContent(relativeFilePath);
+  }
+
+  public async fileExists(relativeFilePath: string): Promise<boolean> {
+    return this.reader.contentExists(relativeFilePath);
+  }
+}
