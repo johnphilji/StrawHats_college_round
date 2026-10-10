@@ -30,7 +30,7 @@ router.use(authenticate);
 const repositoryListQuery = z.object({ page: z.coerce.number().int().min(1).max(1000).default(1), per_page: z.coerce.number().int().min(1).max(100).default(50) });
 
 router.post('/installation/setup', asyncHandler(async (req, res) => {
-  res.status(200).json({ success: true, data: { url: githubAppService.createSetupUrl(req.user!.id) } });
+  res.status(200).json({ success: true, data: { url: await githubAppService.createSetupUrl(req.user!.id) } });
 }));
 
 router.get('/repositories', asyncHandler(async (req, res) => {

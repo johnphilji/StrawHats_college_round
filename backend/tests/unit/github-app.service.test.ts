@@ -10,8 +10,12 @@ function response(data: unknown, status = 200) {
   return new Response(JSON.stringify(data), { status, headers: { 'Content-Type': 'application/json' } });
 }
 
-function makeService(fetcher: typeof fetch) {
-  return new GithubAppService({ appId: '9876', appSlug: 'patchwork', privateKey, frontendUrl: 'http://localhost:5173', supabaseUrl: 'https://example.supabase.co', supabaseSecretKey: 'server-secret', fetcher });
+function makeService(fetcher: typeof fetch, overrides: { resolveGithubAccountId?: (userId: string) => Promise<string | null>; saveInstallation?: (userId: string, installationId: number) => Promise<void> } = {}) {
+  return new GithubAppService({ appId: '9876', appSlug: 'patchwork', privateKey, frontendUrl: 'http://localhost:5173', supabaseUrl: 'https://example.supabase.co', supabaseSecretKey: 'server-secret', fetcher, resolveGithubAccountId: async () => '42', saveInstallation: async () => {}, ...overrides });
+}
+
+async function setupState(service: GithubAppService): Promise<string> {
+  return new URL(await service.createSetupUrl(user.id)).searchParams.get('state')!;
 }
 
 describe('GithubAppService', () => {
@@ -22,12 +26,71 @@ describe('GithubAppService', () => {
     }
   });
 
-  it('creates a short lived signed installation URL bound to the requesting user', () => {
+  it('creates a short lived signed installation URL bound to the requesting user and GitHub identity', async () => {
     const service = makeService(vi.fn() as unknown as typeof fetch);
-    const url = new URL(service.createSetupUrl(user.id));
+    const url = new URL(await service.createSetupUrl(user.id));
     expect(url.origin).toBe('https://github.com');
     expect(url.pathname).toBe('/apps/patchwork/installations/new');
     expect(url.searchParams.get('state')).toMatch(/^[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$/);
+  });
+
+  it('saves the installation only when its verified GitHub account matches the initiating user', async () => {
+    const saveInstallation = vi.fn(async () => {});
+    const fetcher = vi.fn(async () => response({ id: 456, account: { id: 42, login: 'patchwork-user', type: 'User' } }));
+    const service = makeService(fetcher as unknown as typeof fetch, { saveInstallation });
+    const state = await setupState(service);
+    await service.completeInstallation(state, '456');
+    expect(saveInstallation).toHaveBeenCalledWith(user.id, 456);
+    expect(fetcher).toHaveBeenCalledOnce();
+  });
+
+  it('rejects an installation belonging to a different GitHub account', async () => {
+    const saveInstallation = vi.fn(async () => {});
+    const fetcher = vi.fn(async () => response({ id: 456, account: { id: 99, login: 'someone-else', type: 'User' } }));
+    const service = makeService(fetcher as unknown as typeof fetch, { saveInstallation });
+    const state = await setupState(service);
+    await expect(service.completeInstallation(state, '456')).rejects.toMatchObject({ statusCode: 403 });
+    expect(saveInstallation).not.toHaveBeenCalled();
+  });
+
+  it('rejects invalid state before calling GitHub', async () => {
+    const fetcher = vi.fn() as unknown as typeof fetch;
+    const service = makeService(fetcher);
+    const state = await setupState(service);
+    await expect(service.completeInstallation(`invalid.${state}`, '456')).rejects.toMatchObject({ statusCode: 400 });
+    expect(fetcher).not.toHaveBeenCalled();
+  });
+
+  it('rejects expired state', async () => {
+    vi.useFakeTimers();
+    try {
+      const fetcher = vi.fn() as unknown as typeof fetch;
+      const service = makeService(fetcher);
+      const state = await setupState(service);
+      vi.advanceTimersByTime(10 * 60_000 + 1);
+      await expect(service.completeInstallation(state, '456')).rejects.toMatchObject({ statusCode: 400 });
+      expect(fetcher).not.toHaveBeenCalled();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('consumes setup state once and rejects replay', async () => {
+    const fetcher = vi.fn(async () => response({ id: 456, account: { id: 42, login: 'patchwork-user', type: 'User' } }));
+    const service = makeService(fetcher as unknown as typeof fetch);
+    const state = await setupState(service);
+    await service.completeInstallation(state, '456');
+    await expect(service.completeInstallation(state, '456')).rejects.toMatchObject({ statusCode: 409 });
+    expect(fetcher).toHaveBeenCalledOnce();
+  });
+
+  it('does not save an installation when GitHub verification fails', async () => {
+    const saveInstallation = vi.fn(async () => {});
+    const fetcher = vi.fn(async () => response({}, 502));
+    const service = makeService(fetcher as unknown as typeof fetch, { saveInstallation });
+    const state = await setupState(service);
+    await expect(service.completeInstallation(state, '456')).rejects.toMatchObject({ statusCode: 502 });
+    expect(saveInstallation).not.toHaveBeenCalled();
   });
 
   it('lists only repositories returned by the linked installation and never exposes its token', async () => {

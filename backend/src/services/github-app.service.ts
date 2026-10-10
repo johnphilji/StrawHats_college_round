@@ -1,7 +1,7 @@
 import { createHmac, randomBytes, sign as cryptoSign, timingSafeEqual } from 'node:crypto';
 import { createClient } from '@supabase/supabase-js';
 import { getEnv } from '../config/env';
-import { badRequest, forbidden, notFound, AppError } from '../shared/errors/AppError';
+import { badRequest, conflict, forbidden, notFound, AppError } from '../shared/errors/AppError';
 import type { AuthenticatedUser } from '../shared/types/api';
 
 const API = 'https://api.github.com';
@@ -10,9 +10,12 @@ const SOURCE_EXTENSIONS = new Set(['.ts', '.tsx', '.js', '.jsx', '.css', '.scss'
 const BLOCKED_NAMES = /^(\.env(?:\..*)?|\.npmrc|\.pypirc|\.netrc|.*\.(?:pem|key|p12|pfx|keystore))$|(?:credential|secret|service[-_]?account|firebase-adminsdk|id_(?:rsa|ed25519|ecdsa))/i;
 const BLOCKED_DIRECTORIES = new Set(['.ssh', 'credentials', 'secrets', 'private', 'keys']);
 
-type GithubInstallation = { id: number; account?: { login: string; type: string }; repository_selection?: string };
+type GithubInstallation = { id: number; account?: { id: number; login: string; type: string }; repository_selection?: string };
 type GithubRepository = { id: number; name: string; full_name: string; private: boolean; description: string | null; html_url: string; default_branch: string; owner: { login: string } };
 type GithubContent = { type: string; size: number; encoding: string; content: string; path: string };
+type SetupState = { userId: string; githubAccountId: string; exp: number; nonce: string };
+type StoredSetupState = Omit<SetupState, 'nonce'> & { status: 'pending' | 'consumed' };
+type SupabaseUser = { identities?: Array<{ provider?: string; identity_data?: Record<string, unknown> }>; app_metadata?: Record<string, unknown> };
 
 export type GithubAppOptions = {
   appId?: string;
@@ -22,11 +25,14 @@ export type GithubAppOptions = {
   supabaseUrl?: string;
   supabaseSecretKey?: string;
   fetcher?: typeof fetch;
+  resolveGithubAccountId?: (supabaseUserId: string) => Promise<string | null>;
+  saveInstallation?: (supabaseUserId: string, installationId: number) => Promise<void>;
 };
 
 export class GithubAppService {
   private readonly options: GithubAppOptions;
   private readonly fetcher: typeof fetch;
+  private readonly setupStates = new Map<string, StoredSetupState>();
 
   constructor(options: GithubAppOptions = {}) {
     const env = getEnv();
@@ -54,16 +60,50 @@ export class GithubAppService {
     return this.assertConfigured().privateKey;
   }
 
-  createSetupUrl(userId: string): string {
+  private async getSupabaseAdmin() {
+    const { supabaseUrl, supabaseSecretKey } = this.options;
+    if (!supabaseUrl || !supabaseSecretKey) throw new AppError('Supabase admin integration is not configured.', { statusCode: 503, code: 'CONFIGURATION_ERROR' });
+    return createClient(supabaseUrl, supabaseSecretKey, { auth: { autoRefreshToken: false, persistSession: false } });
+  }
+
+  private async githubAccountIdForUser(userId: string): Promise<string | null> {
+    if (this.options.resolveGithubAccountId) return this.options.resolveGithubAccountId(userId);
+    const admin = await this.getSupabaseAdmin();
+    const { data, error } = await admin.auth.admin.getUserById(userId);
+    if (error || !data.user) throw new AppError('Could not verify the PATCHWORK GitHub identity.', { statusCode: 502, code: 'INTERNAL_ERROR' });
+    const user = data.user as unknown as SupabaseUser;
+    const identity = user.identities?.find((candidate) => candidate.provider === 'github');
+    if (!identity?.identity_data) return null;
+    for (const candidate of [identity.identity_data.sub, identity.identity_data.provider_id, identity.identity_data.id]) {
+      if ((typeof candidate === 'number' && Number.isSafeInteger(candidate) && candidate > 0) || (typeof candidate === 'string' && /^\d{1,20}$/.test(candidate))) return String(candidate);
+    }
+    return null;
+  }
+
+  private pruneSetupStates(now = Date.now()): void {
+    for (const [nonce, setupState] of this.setupStates) {
+      if (setupState.exp <= now) this.setupStates.delete(nonce);
+    }
+  }
+
+  async createSetupUrl(userId: string): Promise<string> {
     const { appSlug } = this.assertConfigured();
-    const payload = Buffer.from(JSON.stringify({ userId, exp: Date.now() + 10 * 60_000, nonce: randomBytes(16).toString('hex') })).toString('base64url');
+    const githubAccountId = await this.githubAccountIdForUser(userId);
+    if (!githubAccountId) throw forbidden('Sign in to PATCHWORK with a linked GitHub account before connecting an installation.');
+    const exp = Date.now() + 10 * 60_000;
+    const nonce = randomBytes(16).toString('hex');
+    this.pruneSetupStates();
+    if (this.setupStates.size >= 10_000) throw new AppError('GitHub setup is temporarily unavailable. Try again shortly.', { statusCode: 503, code: 'INTERNAL_ERROR' });
+    const payload = Buffer.from(JSON.stringify({ userId, githubAccountId, exp, nonce } satisfies SetupState)).toString('base64url');
     const signature = createHmac('sha256', this.stateSecret()).update(payload).digest('base64url');
+    this.setupStates.set(nonce, { userId, githubAccountId, exp, status: 'pending' });
     const url = new URL(`https://github.com/apps/${encodeURIComponent(appSlug)}/installations/new`);
     url.searchParams.set('state', `${payload}.${signature}`);
     return url.toString();
   }
 
-  private verifyState(state: string): string {
+  private verifyState(state: string): SetupState {
+    if (typeof state !== 'string' || state.length > 4096) throw badRequest('Invalid GitHub installation state.');
     const [payload, signature, extra] = state.split('.');
     if (!payload || !signature || extra) throw badRequest('Invalid GitHub installation state.');
     const expected = createHmac('sha256', this.stateSecret()).update(payload).digest();
@@ -71,10 +111,21 @@ export class GithubAppService {
     try { received = Buffer.from(signature, 'base64url'); } catch { throw badRequest('Invalid GitHub installation state.'); }
     if (expected.length !== received.length || !timingSafeEqual(expected, received)) throw badRequest('Invalid GitHub installation state.');
     try {
-      const parsed = JSON.parse(Buffer.from(payload, 'base64url').toString('utf8')) as { userId?: string; exp?: number };
-      if (!parsed.userId || !Number.isFinite(parsed.exp) || parsed.exp! < Date.now()) throw new Error('expired');
-      return parsed.userId;
-    } catch { throw badRequest('GitHub installation state has expired or is invalid.'); }
+      const parsed = JSON.parse(Buffer.from(payload, 'base64url').toString('utf8')) as Partial<SetupState>;
+      if (typeof parsed.userId !== 'string' || !parsed.userId || typeof parsed.githubAccountId !== 'string' || !/^\d{1,20}$/.test(parsed.githubAccountId) || !Number.isSafeInteger(parsed.exp) || typeof parsed.nonce !== 'string' || !/^[a-f0-9]{32}$/.test(parsed.nonce)) throw new Error('invalid');
+      if (parsed.exp! <= Date.now()) {
+        this.setupStates.delete(parsed.nonce);
+        throw badRequest('GitHub installation state has expired. Start the connection again.');
+      }
+      const stored = this.setupStates.get(parsed.nonce);
+      if (!stored || stored.userId !== parsed.userId || stored.githubAccountId !== parsed.githubAccountId || stored.exp !== parsed.exp) throw badRequest('Invalid or expired GitHub installation state. Start the connection again.');
+      if (stored.status === 'consumed') throw conflict('GitHub installation state has already been used. Start the connection again.');
+      stored.status = 'consumed';
+      return parsed as SetupState;
+    } catch (error) {
+      if (error instanceof AppError) throw error;
+      throw badRequest('GitHub installation state has expired or is invalid.');
+    }
   }
 
   private async appJwt(): Promise<string> {
@@ -96,18 +147,24 @@ export class GithubAppService {
   }
 
   async completeInstallation(state: string, installationIdInput: string): Promise<void> {
-    const userId = this.verifyState(state);
     if (!/^\d{1,12}$/.test(installationIdInput)) throw badRequest('Invalid GitHub installation ID.');
+    const setupState = this.verifyState(state);
     const installationId = Number(installationIdInput);
     const installation = await this.github<GithubInstallation>(`${API}/app/installations/${installationId}`, await this.appJwt());
-    if (installation.id !== installationId) throw forbidden('GitHub installation could not be verified.');
-    const { supabaseUrl, supabaseSecretKey } = this.options;
-    if (!supabaseUrl || !supabaseSecretKey) throw new AppError('Supabase admin integration is not configured.', { statusCode: 503, code: 'CONFIGURATION_ERROR' });
-    const admin = createClient(supabaseUrl, supabaseSecretKey, { auth: { autoRefreshToken: false, persistSession: false } });
-    const { data, error } = await admin.auth.admin.getUserById(userId);
+    if (installation.id !== installationId || !Number.isSafeInteger(installation.account?.id) || String(installation.account?.id) !== setupState.githubAccountId || installation.account?.type !== 'User') {
+      throw forbidden('The GitHub App installation account does not match the GitHub account that started setup.');
+    }
+    const currentGithubAccountId = await this.githubAccountIdForUser(setupState.userId);
+    if (!currentGithubAccountId || currentGithubAccountId !== setupState.githubAccountId) throw forbidden('The PATCHWORK GitHub identity changed during setup. Start the connection again.');
+    if (this.options.saveInstallation) {
+      await this.options.saveInstallation(setupState.userId, installationId);
+      return;
+    }
+    const admin = await this.getSupabaseAdmin();
+    const { data, error } = await admin.auth.admin.getUserById(setupState.userId);
     if (error || !data.user) throw new AppError('Could not complete the GitHub connection.', { statusCode: 502, code: 'INTERNAL_ERROR' });
     const metadata = { ...data.user.app_metadata, patchwork_github_installation_id: installationId };
-    const update = await admin.auth.admin.updateUserById(userId, { app_metadata: metadata });
+    const update = await admin.auth.admin.updateUserById(setupState.userId, { app_metadata: metadata });
     if (update.error) throw new AppError('Could not complete the GitHub connection.', { statusCode: 502, code: 'INTERNAL_ERROR' });
   }
 
