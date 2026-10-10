@@ -1,19 +1,27 @@
-import { z } from 'zod';
-import dotenv from 'dotenv';
+import { z } from "zod";
+import dotenv from "dotenv";
 
 // Load .env before validation if present (no error if missing)
 dotenv.config();
 
 // Helper: empty string should be treated as undefined (dotenv loads "" for blank vars)
-const emptyToUndefined = (v: unknown) => (v === '' ? undefined : v);
-const optionalUrlSchema = z.preprocess(emptyToUndefined, z.string().url().optional());
-const optionalStringSchema = z.preprocess(emptyToUndefined, z.string().optional());
+const emptyToUndefined = (v: unknown) => (v === "" ? undefined : v);
+const optionalUrlSchema = z.preprocess(
+  emptyToUndefined,
+  z.string().url().optional(),
+);
+const optionalStringSchema = z.preprocess(
+  emptyToUndefined,
+  z.string().optional(),
+);
 
 const envSchema = z.object({
-  NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
+  NODE_ENV: z
+    .enum(["development", "production", "test"])
+    .default("development"),
   PORT: z.coerce.number().int().min(1).max(65535).default(4000),
   FRONTEND_URL: z.preprocess(emptyToUndefined, z.string().url().optional()),
-  ALLOWED_ORIGINS: z.string().default('http://localhost:5173'),
+  ALLOWED_ORIGINS: z.string().default("http://localhost:5173"),
   DATABASE_URL: optionalStringSchema,
   DIRECT_URL: optionalStringSchema,
   SUPABASE_URL: optionalUrlSchema,
@@ -22,11 +30,16 @@ const envSchema = z.object({
   SUPABASE_ANON_KEY: optionalStringSchema,
   SUPABASE_SECRET_KEY: optionalStringSchema,
   SUPABASE_SERVICE_ROLE_KEY: optionalStringSchema,
-  LOG_LEVEL: z.enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace', 'silent']).default('info'),
+  LOG_LEVEL: z
+    .enum(["fatal", "error", "warn", "info", "debug", "trace", "silent"])
+    .default("info"),
   TARGET_REPOSITORY_PATH: optionalStringSchema,
   // Patch provider for the local edit pipeline. Only 'mock' is implemented;
   // unknown names fail fast instead of silently falling back.
-  LLM_PROVIDER: z.string().default('mock'),
+  LLM_PROVIDER: z.string().default("mock"),
+  GITHUB_APP_ID: optionalStringSchema,
+  GITHUB_APP_SLUG: optionalStringSchema,
+  GITHUB_APP_PRIVATE_KEY: optionalStringSchema,
 });
 
 export type Env = z.infer<typeof envSchema>;
@@ -37,8 +50,8 @@ export function validateEnv(): Env {
   const parsed = envSchema.safeParse(process.env);
   if (!parsed.success) {
     const details = parsed.error.issues
-      .map((i) => `${i.path.join('.')}: ${i.message}`)
-      .join('; ');
+      .map((i) => `${i.path.join(".")}: ${i.message}`)
+      .join("; ");
     throw new Error(`Invalid environment configuration: ${details}`);
   }
 
@@ -67,7 +80,7 @@ export function resetEnvCache(): void {
 }
 
 export function getAllowedOrigins(env: Env): string[] {
-  return env.ALLOWED_ORIGINS.split(',')
+  return env.ALLOWED_ORIGINS.split(",")
     .map((o) => o.trim())
     .filter(Boolean);
 }
