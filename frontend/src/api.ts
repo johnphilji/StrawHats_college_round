@@ -1,4 +1,13 @@
-import type { ConnectedWebsite, EditResponse, EditStatus, HistoryEntry, SelectedComponent } from './types';
+import type {
+  ConnectedWebsite,
+  SelectedComponent,
+  CodeChange,
+  PatchConflict,
+  PlaywrightTestRun,
+  Release,
+  AuditLog,
+  HistoryItem,
+} from './types';
 
 export const MOCK_WEBSITES: ConnectedWebsite[] = [
   {
@@ -13,11 +22,15 @@ export const MOCK_WEBSITES: ConnectedWebsite[] = [
     previewUrl: 'http://localhost:3000',
     productionUrl: 'https://acme-store.patchwork.dev',
     status: 'connected',
+    mode: 'managed',
+    runtimeLoaderInstalled: true,
     lastModified: 'Just now',
     componentCount: 14,
     category: 'Ecommerce',
     icon: '🐾',
     framework: 'Vanilla HTML5 / CSS3',
+    activeRelease: 'v1.2.0',
+    activePatchesCount: 3,
   },
   {
     id: 'nova-saas',
@@ -30,11 +43,15 @@ export const MOCK_WEBSITES: ConnectedWebsite[] = [
     previewUrl: 'http://localhost:3001',
     productionUrl: 'https://nova-ai.patchwork.dev',
     status: 'connected',
+    mode: 'managed',
+    runtimeLoaderInstalled: true,
     lastModified: '2 hours ago',
     componentCount: 22,
     category: 'SaaS',
     icon: '⚡',
     framework: 'React / Vite / Tailwind',
+    activeRelease: 'v2.0.4',
+    activePatchesCount: 2,
   },
   {
     id: 'pulse-docs',
@@ -47,15 +64,18 @@ export const MOCK_WEBSITES: ConnectedWebsite[] = [
     previewUrl: 'http://localhost:3002',
     productionUrl: 'https://docs.pulse.patchwork.dev',
     status: 'connected',
+    mode: 'preview_only',
+    runtimeLoaderInstalled: false,
     lastModified: 'Yesterday',
     componentCount: 18,
     category: 'Docs',
     icon: '📖',
     framework: 'Docusaurus / MDX',
+    activeRelease: 'v1.0.0',
+    activePatchesCount: 1,
   },
 ];
 
-// Interactive mock elements for Acme Store
 export const MOCK_COMPONENTS: SelectedComponent[] = [
   {
     componentId: 'hero-cta',
@@ -64,12 +84,29 @@ export const MOCK_COMPONENTS: SelectedComponent[] = [
     text: 'Buy Now — $34.99',
     sourceFile: 'index.html:L54 & styles.css:L132',
     lineRange: 'index.html (54-56)',
+    fingerprint: {
+      tag: 'BUTTON',
+      selector: '#hero-cta',
+      text: 'Buy Now — $34.99',
+      attributes: { id: 'hero-cta', class: 'btn-primary hero-btn' },
+      parentTag: 'DIV',
+      parentSelector: '.hero-actions',
+      domPath: 'html > body > header > div.hero-actions > button#hero-cta',
+      confidenceScore: 99,
+      confidenceBreakdown: {
+        text: 25,
+        tagAndAttributes: 20,
+        domStructure: 25,
+        parentAndSibling: 19,
+        nearbyContent: 10,
+      },
+    },
     styles: {
       color: '#ffffff',
       backgroundColor: '#2563eb',
-      fontSize: '16px',
+      fontSize: '15px',
       fontWeight: '600',
-      padding: '14px 28px',
+      padding: '12px 24px',
       margin: '0',
       borderRadius: '8px',
       display: 'inline-flex',
@@ -83,36 +120,70 @@ export const MOCK_COMPONENTS: SelectedComponent[] = [
     text: 'Premium Care for Happy Companions',
     sourceFile: 'index.html:L42 & styles.css:L98',
     lineRange: 'index.html (42-43)',
+    fingerprint: {
+      tag: 'H1',
+      selector: '#hero-title',
+      text: 'Premium Care for Happy Companions',
+      attributes: { id: 'hero-title', class: 'title-display' },
+      parentTag: 'DIV',
+      parentSelector: '.hero-content',
+      domPath: 'html > body > header > div.hero-content > h1#hero-title',
+      confidenceScore: 98,
+      confidenceBreakdown: {
+        text: 25,
+        tagAndAttributes: 20,
+        domStructure: 24,
+        parentAndSibling: 19,
+        nearbyContent: 10,
+      },
+    },
     styles: {
       color: '#0f172a',
       backgroundColor: 'transparent',
-      fontSize: '44px',
+      fontSize: '32px',
       fontWeight: '800',
       padding: '0',
-      margin: '0 0 16px 0',
+      margin: '0 0 12px 0',
       borderRadius: '0px',
       display: 'block',
     },
-    rect: { x: 80, y: 190, width: 520, height: 110 },
+    rect: { x: 80, y: 190, width: 520, height: 90 },
   },
   {
     componentId: 'checkout-button',
-    label: 'Checkout Button',
+    label: 'Proceed to Checkout Button',
     tagName: 'BUTTON',
     text: 'Proceed to Checkout',
     sourceFile: 'index.html:L112 & styles.css:L285',
     lineRange: 'index.html (112-114)',
+    fingerprint: {
+      tag: 'BUTTON',
+      selector: '#checkout-button',
+      text: 'Proceed to Checkout',
+      attributes: { id: 'checkout-button', class: 'btn-checkout' },
+      parentTag: 'DIV',
+      parentSelector: '.cart-summary-actions',
+      domPath: 'html > body > main > section > div > button#checkout-button',
+      confidenceScore: 97,
+      confidenceBreakdown: {
+        text: 25,
+        tagAndAttributes: 20,
+        domStructure: 23,
+        parentAndSibling: 19,
+        nearbyContent: 10,
+      },
+    },
     styles: {
       color: '#ffffff',
       backgroundColor: '#16a34a',
-      fontSize: '15px',
+      fontSize: '14px',
       fontWeight: '700',
-      padding: '12px 24px',
+      padding: '12px 20px',
       margin: '8px 0',
       borderRadius: '6px',
       display: 'inline-flex',
     },
-    rect: { x: 800, y: 440, width: 220, height: 44 },
+    rect: { x: 740, y: 380, width: 230, height: 46 },
   },
   {
     componentId: 'product-price',
@@ -121,17 +192,34 @@ export const MOCK_COMPONENTS: SelectedComponent[] = [
     text: '$34.99',
     sourceFile: 'index.html:L78 & styles.css:L160',
     lineRange: 'index.html (78-79)',
+    fingerprint: {
+      tag: 'SPAN',
+      selector: '.product-card .price-tag',
+      text: '$34.99',
+      attributes: { class: 'price-tag' },
+      parentTag: 'DIV',
+      parentSelector: '.product-meta',
+      domPath: 'html > body > main > div.product-card > span.price-tag',
+      confidenceScore: 94,
+      confidenceBreakdown: {
+        text: 24,
+        tagAndAttributes: 19,
+        domStructure: 24,
+        parentAndSibling: 18,
+        nearbyContent: 9,
+      },
+    },
     styles: {
       color: '#16a34a',
       backgroundColor: '#dcfce7',
-      fontSize: '22px',
+      fontSize: '18px',
       fontWeight: '700',
-      padding: '4px 10px',
+      padding: '4px 8px',
       margin: '0',
       borderRadius: '9999px',
       display: 'inline-block',
     },
-    rect: { x: 80, y: 280, width: 90, height: 32 },
+    rect: { x: 80, y: 280, width: 80, height: 28 },
   },
   {
     componentId: 'nav-announcement',
@@ -140,10 +228,27 @@ export const MOCK_COMPONENTS: SelectedComponent[] = [
     text: '🐾 Flash Sale: 20% off all organic treats with code PATCHWORK',
     sourceFile: 'index.html:L15 & styles.css:L35',
     lineRange: 'index.html (15-18)',
+    fingerprint: {
+      tag: 'DIV',
+      selector: '.announcement-bar',
+      text: '🐾 Flash Sale: 20% off all organic treats with code PATCHWORK',
+      attributes: { class: 'announcement-bar' },
+      parentTag: 'HEADER',
+      parentSelector: 'header.site-header',
+      domPath: 'html > body > header > div.announcement-bar',
+      confidenceScore: 96,
+      confidenceBreakdown: {
+        text: 25,
+        tagAndAttributes: 20,
+        domStructure: 24,
+        parentAndSibling: 18,
+        nearbyContent: 9,
+      },
+    },
     styles: {
       color: '#ffffff',
       backgroundColor: '#4338ca',
-      fontSize: '13px',
+      fontSize: '12.5px',
       fontWeight: '500',
       padding: '8px 16px',
       margin: '0',
@@ -154,16 +259,170 @@ export const MOCK_COMPONENTS: SelectedComponent[] = [
   },
 ];
 
-const delay = (ms: number) => new Promise(r => setTimeout(r, ms));
+export const INITIAL_CONFLICTS: PatchConflict[] = [
+  {
+    id: 'conflict-101',
+    targetFingerprint: '#checkout-button',
+    elementLabel: 'Checkout Button',
+    property: 'backgroundColor',
+    originalBaseline: '#16a34a (Original Green)',
+    status: 'unresolved',
+    patchA: {
+      patchId: 'patch-001',
+      author: 'Alex Rivera (Frontend Lead)',
+      value: '#2563eb (Royal Blue)',
+      timestamp: '15 mins ago',
+    },
+    patchB: {
+      patchId: 'patch-004',
+      author: 'Marcus Vance (CRO Specialist)',
+      value: '#ef4444 (Crimson Red)',
+      timestamp: '5 mins ago',
+    },
+  },
+];
 
-function generateDiff(component: SelectedComponent, instruction: string): { diff: string; files: string[]; explanation: string } {
-  const instLower = instruction.toLowerCase();
+export const INITIAL_TEST_RUNS: PlaywrightTestRun[] = [
+  {
+    id: 'test-891',
+    patchTitle: 'Fix Checkout Button Label & Brand Color',
+    status: 'passed',
+    durationMs: 740,
+    timestamp: '10 mins ago',
+    mismatchPercentage: 0.8,
+    checks: [
+      { id: 'c1', name: 'Element Reachability & Visibility', status: 'pass', message: 'Target element #checkout-button visible in viewport', durationMs: 140 },
+      { id: 'c2', name: 'Interaction & Synthetic Click', status: 'pass', message: 'Triggered simulated user click; intercepted route without crash', durationMs: 220 },
+      { id: 'c3', name: 'Content Security & CSP Guard', status: 'pass', message: 'No unauthorized eval or CSP violations detected', durationMs: 90 },
+      { id: 'c4', name: 'Visual Regression (Pixel Diff)', status: 'pass', message: 'Mismatch: 0.8% (Target component modified as expected)', durationMs: 290 },
+    ],
+  },
+  {
+    id: 'test-892',
+    patchTitle: 'Urgent Red Checkout Button Override',
+    status: 'failed',
+    durationMs: 820,
+    timestamp: '2 mins ago',
+    mismatchPercentage: 4.2,
+    checks: [
+      { id: 'c1', name: 'Element Reachability & Visibility', status: 'pass', message: 'Target element visible', durationMs: 110 },
+      { id: 'c2', name: 'Conflict Engine Validation', status: 'fail', message: 'CONCURRENT MODIFICATION: Overlaps active Patch on backgroundColor', durationMs: 75 },
+      { id: 'c3', name: 'Interaction & Synthetic Click', status: 'pass', message: 'Synthetic event test passed', durationMs: 210 },
+      { id: 'c4', name: 'Pre-flight Release Gate', status: 'fail', message: 'Deployment BLOCKED until conflict is resolved by maintainer', durationMs: 425 },
+    ],
+  },
+];
 
-  if (component.componentId === 'hero-cta' || instLower.includes('get started') || instLower.includes('green')) {
-    return {
-      files: ['styles.css', 'index.html'],
-      explanation: 'Changed button background to emerald green (#10b981) and updated CTA copy to "Get Started".',
-      diff: `--- a/Ecommerce/styles.css
+export const INITIAL_RELEASES: Release[] = [
+  {
+    id: 'rel-120',
+    version: 'v1.2.0',
+    projectId: 'acme-store',
+    status: 'active',
+    deployedAt: '12 mins ago',
+    deployedBy: 'Alex Rivera',
+    duration: '180ms',
+    patchesCount: 3,
+  },
+  {
+    id: 'rel-110',
+    version: 'v1.1.0',
+    projectId: 'acme-store',
+    status: 'deprecated',
+    deployedAt: '3 hours ago',
+    deployedBy: 'Alex Rivera',
+    duration: '210ms',
+    patchesCount: 2,
+  },
+  {
+    id: 'rel-100',
+    version: 'v1.0.0',
+    projectId: 'acme-store',
+    status: 'deprecated',
+    deployedAt: 'Yesterday',
+    deployedBy: 'Sarah Chen',
+    duration: '195ms',
+    patchesCount: 1,
+  },
+];
+
+export const INITIAL_AUDIT_LOGS: AuditLog[] = [
+  {
+    id: 'log-01',
+    timestamp: '12 mins ago',
+    user: { name: 'Alex Rivera', avatar: '👨‍💻' },
+    action: 'DEPLOY_RELEASE',
+    category: 'deploy',
+    target: 'Release v1.2.0',
+    details: 'Deployed 3 active patches to production. Applied in 180ms with zero rebuild.',
+  },
+  {
+    id: 'log-02',
+    timestamp: '14 mins ago',
+    user: { name: 'Alex Rivera', avatar: '👨‍💻' },
+    action: 'TEST_PASSED',
+    category: 'test',
+    target: 'Patch #checkout-button',
+    details: 'Playwright automated test suite passed with 0.8% visual difference gate.',
+  },
+  {
+    id: 'log-03',
+    timestamp: '18 mins ago',
+    user: { name: 'Marcus Vance', avatar: '🧑‍🎨' },
+    action: 'CONFLICT_FLAGGED',
+    category: 'conflict',
+    target: '#checkout-button (backgroundColor)',
+    details: 'Automated conflict detector caught concurrent backgroundColor edit.',
+  },
+];
+
+export const INITIAL_HISTORY: HistoryItem[] = [
+  {
+    id: 'hist-1',
+    componentLabel: 'Buy Now Button',
+    instruction: 'Make button emerald green and change copy to "Get Started ➔"',
+    branch: 'patchwork/edit-hero-cta-7e3a',
+    commitSha: 'b54911e',
+    timestamp: '25 mins ago',
+    status: 'deployed',
+    author: 'AI Agent (PATCHWORK)',
+  },
+  {
+    id: 'hist-2',
+    componentLabel: 'Top Announcement Banner',
+    instruction: 'Update promo text with 20% off discount banner',
+    branch: 'patchwork/edit-promo-821f',
+    commitSha: 'a19bc32',
+    timestamp: '2 hours ago',
+    status: 'deployed',
+    author: 'AI Agent (PATCHWORK)',
+  },
+];
+
+export const delay = (ms: number) => new Promise(r => setTimeout(r, ms));
+
+export function generateCodeChange(
+  component: SelectedComponent,
+  instruction: string
+): CodeChange {
+  const hash = Math.random().toString(36).substring(2, 6);
+  const branch = `patchwork/edit-${component.componentId}-${hash}`;
+  const commitSha = Math.random().toString(16).substring(2, 9);
+  const lower = instruction.toLowerCase();
+
+  let diff = '';
+  let modifiedFiles = ['styles.css'];
+  let explanation = '';
+  const previewApplied: CodeChange['previewApplied'] = {};
+
+  if (lower.includes('green') || lower.includes('emerald') || lower.includes('get started')) {
+    modifiedFiles = ['styles.css', 'index.html'];
+    explanation = 'Changed button background to emerald green (#10b981) and updated text to "Get Started ➔".';
+    previewApplied.backgroundColor = '#10b981';
+    previewApplied.text = 'Get Started ➔';
+    previewApplied.borderRadius = '9999px';
+
+    diff = `--- a/Ecommerce/styles.css
 +++ b/Ecommerce/styles.css
 @@ -132,4 +132,4 @@
  .btn-primary {
@@ -172,162 +431,59 @@ function generateDiff(component: SelectedComponent, instruction: string): { diff
    color: #ffffff;
 -  border-radius: 8px;
 +  border-radius: 9999px;
-   box-shadow: 0 4px 14px rgba(16, 185, 129, 0.35);
  }
 
 --- a/Ecommerce/index.html
 +++ b/Ecommerce/index.html
 @@ -54,3 +54,3 @@
 -  <button class="btn-primary" id="hero-cta">Buy Now — $34.99</button>
-+  <button class="btn-primary" id="hero-cta">Get Started ➔</button>`,
-    };
-  }
++  <button class="btn-primary" id="hero-cta">Get Started ➔</button>`;
+  } else if (lower.includes('blue') || lower.includes('payment') || lower.includes('checkout')) {
+    modifiedFiles = ['styles.css', 'index.html'];
+    explanation = 'Updated button to royal blue (#2563eb) and set label to "Continue to Payment 🔒".';
+    previewApplied.backgroundColor = '#2563eb';
+    previewApplied.text = 'Continue to Payment 🔒';
 
-  if (instLower.includes('payment') || instLower.includes('checkout')) {
-    return {
-      files: ['index.html', 'styles.css'],
-      explanation: 'Renamed button text to "Continue to Payment" and added secure lock badge icon.',
-      diff: `--- a/Ecommerce/index.html
+    diff = `--- a/Ecommerce/index.html
 +++ b/Ecommerce/index.html
 @@ -112,3 +112,3 @@
 -  <button class="btn-checkout" id="checkout-button">Proceed to Checkout</button>
-+  <button class="btn-checkout" id="checkout-button">🔒 Continue to Payment</button>
++  <button class="btn-checkout" id="checkout-button">Continue to Payment 🔒</button>
 
 --- a/Ecommerce/styles.css
 +++ b/Ecommerce/styles.css
 @@ -285,3 +285,3 @@
  .btn-checkout {
 -  background-color: #16a34a;
-+  background-color: #059669;
++  background-color: #2563eb;
    font-weight: 700;
-+  letter-spacing: 0.02em;`,
-    };
-  }
+ }`;
+  } else {
+    explanation = `Applied requested visual style update to ${component.label}.`;
+    previewApplied.backgroundColor = '#7c3aed';
+    previewApplied.borderRadius = '8px';
 
-  if (instLower.includes('discount') || instLower.includes('badge') || instLower.includes('sale') || instLower.includes('banner')) {
-    return {
-      files: ['index.html', 'styles.css'],
-      explanation: 'Updated banner colors to vibrant amber gradient and changed promotion text.',
-      diff: `--- a/Ecommerce/index.html
-+++ b/Ecommerce/index.html
-@@ -15,3 +15,3 @@
--  <div class="announcement">🐾 Flash Sale: 20% off all organic treats</div>
-+  <div class="announcement">🔥 HACKATHON SPECIAL: 50% OFF All Orders Today Only!</div>
-
---- a/Ecommerce/styles.css
+    diff = `--- a/Ecommerce/styles.css
 +++ b/Ecommerce/styles.css
-@@ -35,3 +35,4 @@
- .announcement {
--  background-color: #4338ca;
-+  background: linear-gradient(90deg, #f59e0b, #ef4444);
-+  font-weight: 700;
- }`,
-    };
+@@ -132,3 +132,4 @@
+ .${component.componentId} {
+-  /* original styles */
++  background-color: #7c3aed;
++  transition: all 0.2s ease-in-out;
+ }`;
   }
 
   return {
-    files: ['styles.css'],
-    explanation: `Applied visual modifications requested: "${instruction.slice(0, 50)}..." to ${component.label}.`,
-    diff: `--- a/Ecommerce/styles.css
-+++ b/Ecommerce/styles.css
-@@ -100,5 +100,6 @@
- /* Target: ${component.label} (${component.componentId}) */
- .${component.componentId} {
--  /* standard styles */
-+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
-+  /* prompt: "${instruction.slice(0, 35)}" */
- }`,
-  };
-}
-
-export async function submitEditRequest(
-  component: SelectedComponent,
-  instruction: string,
-  onStatusChange: (status: EditStatus, data?: Partial<EditResponse>) => void
-): Promise<EditResponse> {
-  const hash = Math.random().toString(36).substring(2, 6);
-  const branchName = `patchwork/edit-${component.componentId}-${hash}`;
-  const commitSha = Math.random().toString(16).substring(2, 9);
-  const editId = `edit_${Date.now()}`;
-
-  // Step 1: Identifying & Generating
-  onStatusChange('generating');
-  await delay(1200);
-
-  // Step 2: Testing & Syntax Validation
-  onStatusChange('testing');
-  await delay(900);
-
-  const { diff, files, explanation } = generateDiff(component, instruction);
-
-  const response: EditResponse = {
-    editId,
-    branch: branchName,
-    status: 'approved',
-    diff,
+    editId: `edit_${Date.now()}`,
+    componentId: component.componentId,
+    componentLabel: component.label,
+    instruction,
+    branch,
     commitSha,
-    previewUrl: `http://localhost:3000?pw_branch=${branchName}`,
-    validationPassed: true,
-    modifiedFiles: files,
+    status: 'review_diff',
+    diff,
+    modifiedFiles,
     explanation,
+    previewApplied,
   };
-
-  onStatusChange('approved', response);
-  return response;
 }
-
-export async function mergeAndDeploy(
-  _editId: string,
-  onStatusChange: (status: EditStatus) => void
-): Promise<void> {
-  onStatusChange('merged');
-  await delay(700);
-  onStatusChange('deploying');
-  await delay(1600);
-  onStatusChange('deployed');
-}
-
-export async function rollback(
-  _editId: string,
-  onStatusChange: (status: EditStatus) => void
-): Promise<void> {
-  onStatusChange('deploying');
-  await delay(900);
-  onStatusChange('rolled_back');
-}
-
-export const MOCK_HISTORY: HistoryEntry[] = [
-  {
-    editId: 'edit_001',
-    componentId: 'hero-cta',
-    label: 'Buy Now Button',
-    instruction: 'Change button color to emerald green and rename text to "Get Started"',
-    branch: 'patchwork/edit-hero-cta-7e3a',
-    status: 'deployed',
-    commitSha: 'b54911e',
-    timestamp: '14 minutes ago',
-    author: 'AI Agent (Claude 3.5 Sonnet)',
-  },
-  {
-    editId: 'edit_002',
-    componentId: 'nav-announcement',
-    label: 'Top Announcement Banner',
-    instruction: 'Update promo text to mention 20% off with code PATCHWORK',
-    branch: 'patchwork/edit-promo-821f',
-    status: 'deployed',
-    commitSha: 'a19bc32',
-    timestamp: '1 hour ago',
-    author: 'AI Agent (Claude 3.5 Sonnet)',
-  },
-  {
-    editId: 'edit_003',
-    componentId: 'product-price',
-    label: 'Featured Price Tag',
-    instruction: 'Highlight price badge with soft green pill background and bold font',
-    branch: 'patchwork/edit-price-44b2',
-    status: 'deployed',
-    commitSha: '9c882ef',
-    timestamp: '3 hours ago',
-    author: 'AI Agent (Claude 3.5 Sonnet)',
-  },
-];

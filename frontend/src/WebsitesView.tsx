@@ -10,176 +10,124 @@ interface WebsitesViewProps {
 export default function WebsitesView({ onSelectWebsite }: WebsitesViewProps) {
   const [websites, setWebsites] = useState<ConnectedWebsite[]>(MOCK_WEBSITES);
   const [showModal, setShowModal] = useState(false);
-  const [newRepoUrl, setNewRepoUrl] = useState('');
-  const [newRepoName, setNewRepoName] = useState('');
-  const [newCategory, setNewCategory] = useState<'Ecommerce' | 'SaaS' | 'Docs' | 'Portfolio'>('Ecommerce');
+  const [name, setName] = useState('');
+  const [repoUrl, setRepoUrl] = useState('');
 
   const handleConnect = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newRepoName.trim()) return;
+    if (!name.trim()) return;
 
     const newSite: ConnectedWebsite = {
       id: `site_${Date.now()}`,
-      name: newRepoName,
-      tagline: `Connected repository ${newRepoUrl || 'custom'}`,
-      repoUrl: newRepoUrl || 'https://github.com/johnphilji/my-website.git',
+      name,
+      tagline: `Connected repository ${repoUrl || 'custom'}`,
+      repoUrl: repoUrl || 'https://github.com/organization/new-site.git',
       repoOwner: 'johnphilji',
-      repoName: newRepoName.toLowerCase().replace(/\s+/g, '-'),
+      repoName: name.toLowerCase().replace(/\s+/g, '-'),
       branch: 'main',
       previewUrl: 'http://localhost:3000',
-      productionUrl: `https://${newRepoName.toLowerCase().replace(/\s+/g, '-')}.patchwork.dev`,
+      productionUrl: `https://${name.toLowerCase().replace(/\s+/g, '-')}.patchwork.dev`,
       status: 'connected',
+      mode: 'managed',
+      runtimeLoaderInstalled: true,
       lastModified: 'Just now',
-      componentCount: 12,
-      category: newCategory,
-      icon: newCategory === 'Ecommerce' ? '🛍️' : newCategory === 'SaaS' ? '⚡' : '📄',
+      componentCount: 8,
+      category: 'Ecommerce',
+      icon: '🛍️',
       framework: 'HTML / CSS / JS',
+      activeRelease: 'v1.0.0',
+      activePatchesCount: 0,
     };
 
-    setWebsites(prev => [newSite, ...prev]);
+    setWebsites([newSite, ...websites]);
     setShowModal(false);
-    setNewRepoName('');
-    setNewRepoUrl('');
+    setName('');
+    setRepoUrl('');
   };
 
   return (
     <div className={styles.container}>
       {/* Header */}
       <div className={styles.header}>
-        <div className={styles.titleArea}>
-          <div className={styles.title}>
-            Connected Websites
-            <span className={styles.titleBadge}>Multi-Repository</span>
-          </div>
+        <div>
+          <h1 className={styles.title}>Connected Websites</h1>
           <p className={styles.subtitle}>
-            PATCHWORK acts as an intelligent visual editing layer on top of your connected Git repositories.
-            Select a website to load its preview and start editing components visually.
+            Select a website to load its preview and start visual editing. PATCHWORK connects directly to your Git repository.
           </p>
         </div>
 
         <button className={styles.connectBtn} onClick={() => setShowModal(true)}>
-          <span>+</span> Connect New Repository
+          + Connect Website
         </button>
       </div>
 
-      {/* GitHub Auth & Repo Bridge Status Banner */}
-      <div className={styles.authBanner}>
-        <div className={styles.authInfo}>
-          <span className={styles.authDot} />
-          <span>GitHub App Integration: <strong>Authorized</strong></span>
-          <span>•</span>
-          <span className={styles.authScope}>Scope: repo, workflow, write:packages</span>
-        </div>
-        <div className={styles.authScope}>
-          3 Repositories Synchronized
-        </div>
-      </div>
-
-      {/* Grid of connected websites */}
+      {/* Website Cards Grid */}
       <div className={styles.grid}>
         {websites.map(site => (
-          <div key={site.id} className={styles.card}>
-            <div className={styles.cardHeader}>
-              <div className={styles.siteIcon}>{site.icon}</div>
-              <div className={styles.siteTitleGroup}>
-                <div className={styles.siteName}>{site.name}</div>
-                <div className={styles.siteCategory}>{site.category} • {site.framework}</div>
+          <div key={site.id} className={styles.card} onClick={() => onSelectWebsite(site)}>
+            <div className={styles.cardTop}>
+              <div className={styles.iconBox}>{site.icon}</div>
+              <div className={styles.infoBox}>
+                <h3 className={styles.siteName}>{site.name}</h3>
+                <div className={styles.repoPill}>
+                  <span>📦 {site.repoOwner}/{site.repoName}</span>
+                  <span style={{ color: '#94a3b8' }}>•</span>
+                  <span>⎇ {site.branch}</span>
+                </div>
               </div>
             </div>
 
-            <p className={styles.siteTagline}>{site.tagline}</p>
+            <p className={styles.tagline}>{site.tagline}</p>
 
-            <div className={styles.repoBox}>
-              <div className={styles.repoRow}>
-                <span className={styles.repoLabel}>Repository</span>
-                <span className={styles.repoValue}>
-                  {site.repoOwner}/{site.repoName}
-                  {site.subpath && <span style={{ color: '#94a3b8' }}>{site.subpath}</span>}
-                </span>
-              </div>
-              <div className={styles.repoRow}>
-                <span className={styles.repoLabel}>Target Branch</span>
-                <span className={styles.branchTag}>⎇ {site.branch}</span>
-              </div>
-              <div className={styles.repoRow}>
-                <span className={styles.repoLabel}>Local Preview</span>
-                <span className={styles.repoValue}>{site.previewUrl}</span>
-              </div>
+            <div className={styles.cardFooter}>
+              <span className={styles.previewUrl}>{site.previewUrl}</span>
+              <button className={styles.openBtn}>
+                Open in Editor ➔
+              </button>
             </div>
-
-            <div className={styles.statsRow}>
-              <span className={styles.statusLive}>
-                <span className={styles.statusLiveDot} />
-                Live Preview Ready
-              </span>
-              <span>{site.componentCount} Components</span>
-            </div>
-
-            <button
-              className={styles.openBtn}
-              onClick={() => onSelectWebsite(site)}
-            >
-              <span>✦</span> Open in Visual Editor ➔
-            </button>
           </div>
         ))}
       </div>
 
-      {/* Modal to connect a new repo */}
+      {/* Connect Modal */}
       {showModal && (
-        <div className={styles.modalBackdrop} onClick={() => setShowModal(false)}>
+        <div className={styles.overlay} onClick={() => setShowModal(false)}>
           <div className={styles.modal} onClick={e => e.stopPropagation()}>
             <div className={styles.modalHeader}>
-              <h3 className={styles.modalTitle}>Connect GitHub Repository</h3>
-              <button className={styles.modalClose} onClick={() => setShowModal(false)}>✕</button>
+              <h3 className={styles.modalTitle}>Connect a Website Repository</h3>
+              <button className={styles.closeBtn} onClick={() => setShowModal(false)}>✕</button>
             </div>
 
-            <form onSubmit={handleConnect}>
-              <div className={styles.modalField}>
-                <label className={styles.modalLabel}>Website Name</label>
+            <form onSubmit={handleConnect} className={styles.form}>
+              <div className={styles.field}>
+                <label className={styles.label}>Website Name</label>
                 <input
-                  className={styles.modalInput}
+                  type="text"
                   placeholder="e.g. Acme Pet Store"
-                  value={newRepoName}
-                  onChange={e => setNewRepoName(e.target.value)}
+                  value={name}
+                  onChange={e => setName(e.target.value)}
+                  className={styles.input}
                   required
                 />
               </div>
 
-              <div className={styles.modalField}>
-                <label className={styles.modalLabel}>GitHub Repository URL</label>
+              <div className={styles.field}>
+                <label className={styles.label}>Git Repository URL</label>
                 <input
-                  className={styles.modalInput}
+                  type="url"
                   placeholder="https://github.com/johnphilji/demo-sites.git"
-                  value={newRepoUrl}
-                  onChange={e => setNewRepoUrl(e.target.value)}
+                  value={repoUrl}
+                  onChange={e => setRepoUrl(e.target.value)}
+                  className={styles.input}
                 />
               </div>
 
-              <div className={styles.modalField}>
-                <label className={styles.modalLabel}>Type / Category</label>
-                <select
-                  className={styles.modalInput}
-                  value={newCategory}
-                  onChange={e => setNewCategory(e.target.value as any)}
-                >
-                  <option value="Ecommerce">Ecommerce Store</option>
-                  <option value="SaaS">SaaS Landing Page</option>
-                  <option value="Docs">Documentation</option>
-                  <option value="Portfolio">Portfolio / Company</option>
-                </select>
-              </div>
-
               <div className={styles.modalActions}>
-                <button
-                  type="button"
-                  className={styles.cancelBtn}
-                  onClick={() => setShowModal(false)}
-                >
+                <button type="button" className={styles.cancelBtn} onClick={() => setShowModal(false)}>
                   Cancel
                 </button>
                 <button type="submit" className={styles.submitBtn}>
-                  Connect & Load
+                  Connect Website
                 </button>
               </div>
             </form>

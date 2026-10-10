@@ -1,0 +1,23 @@
+{
+  "name": "strawhats-patchwork",
+  "version": "1.0.0",
+  "description": "PATCHWORK — Platform to modify, test, deploy, and roll back live website changes without rebuilding",
+  "private": true,
+  "scripts": {
+    "dev": "npm run --prefix frontend dev",
+    "dev:frontend": "npm run --prefix frontend dev",
+    "dev:backend": "npm run --prefix backend dev",
+    "build": "npm run --prefix frontend build",
+    "build:frontend": "npm run --prefix frontend build",
+    "build:backend": "npm run --prefix backend build",
+    "lint": "npm run --prefix frontend lint"
+  },
+  "keywords": [
+    "patchwork",
+    "hotfix",
+    "visual-editor",
+    "runtime-loader"
+  ],
+  "author": "StrawHats",
+  "license": "ISC"
+}

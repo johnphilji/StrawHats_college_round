@@ -1,76 +1,49 @@
 import styles from './HistoryView.module.css';
-import type { HistoryEntry, EditStatus } from './types';
-import { MOCK_HISTORY } from './api';
+import type { HistoryItem } from './types';
 
-function StatusPill({ status }: { status: EditStatus }) {
-  const colors: Partial<Record<EditStatus, string>> = {
-    deployed:    styles.pillDeployed,
-    rolled_back: styles.pillRolledBack,
-    failed:      styles.pillFailed,
-    approved:    styles.pillApproved,
-  };
-  return (
-    <span className={`${styles.pill} ${colors[status] ?? styles.pillDefault}`}>
-      {status.replace('_', ' ')}
-    </span>
-  );
+interface HistoryViewProps {
+  history: HistoryItem[];
+  onRollback?: (id: string) => void;
 }
 
-function timeAgo(iso: string): string {
-  const diff = Date.now() - new Date(iso).getTime();
-  const mins = Math.floor(diff / 60000);
-  if (mins < 60) return `${mins}m ago`;
-  const hrs = Math.floor(mins / 60);
-  if (hrs < 24) return `${hrs}h ago`;
-  return `${Math.floor(hrs / 24)}d ago`;
-}
-
-export default function HistoryView() {
-  const history: HistoryEntry[] = MOCK_HISTORY;
-
+export default function HistoryView({ history, onRollback }: HistoryViewProps) {
   return (
-    <div className={styles.view}>
+    <div className={styles.container}>
       <div className={styles.header}>
-        <h2 className={styles.title}>Change History</h2>
-        <div className={styles.subtitle}>All edits across all components, newest first.</div>
-      </div>
-
-      <div className={styles.statsRow}>
-        <div className={styles.stat}>
-          <div className={styles.statValue}>{history.filter(h => h.status === 'deployed').length}</div>
-          <div className={styles.statLabel}>Deployed</div>
-        </div>
-        <div className={styles.stat}>
-          <div className={styles.statValue}>{history.filter(h => h.status === 'rolled_back').length}</div>
-          <div className={styles.statLabel}>Rolled back</div>
-        </div>
-        <div className={styles.stat}>
-          <div className={styles.statValue}>{history.length}</div>
-          <div className={styles.statLabel}>Total edits</div>
-        </div>
+        <h1 className={styles.title}>Release History</h1>
+        <p className={styles.subtitle}>
+          All visual changes approved, merged into <strong>main</strong>, and deployed to production.
+        </p>
       </div>
 
       <div className={styles.list}>
-        {history.map((entry, i) => (
-          <div key={entry.editId} className={styles.card} style={{ animationDelay: `${i * 60}ms` }}>
-            <div className={styles.cardLeft}>
-              <div className={styles.cardIcon}>
-                {entry.status === 'deployed' ? '✓' : entry.status === 'rolled_back' ? '↩' : '⚡'}
+        {history.map(item => (
+          <div key={item.id} className={styles.card}>
+            <div className={styles.cardHeader}>
+              <div className={styles.badgeGroup}>
+                <span className={styles.compBadge}>{item.componentLabel}</span>
+                <span className={`${styles.statusBadge} ${item.status === 'deployed' ? styles.statusDeployed : styles.statusRollback}`}>
+                  {item.status === 'deployed' ? '● Live in Main' : '↺ Rolled Back'}
+                </span>
               </div>
-              {i < history.length - 1 && <div className={styles.cardLine} />}
+              <span className={styles.timestamp}>{item.timestamp}</span>
             </div>
-            <div className={styles.cardBody}>
-              <div className={styles.cardTop}>
-                <div className={styles.cardLabel}>{entry.label}</div>
-                <StatusPill status={entry.status} />
-              </div>
-              <div className={styles.cardInstruction}>"{entry.instruction}"</div>
-              <div className={styles.cardMeta}>
-                <span className={styles.cardBranch}>⎇ {entry.branch}</span>
-                <span className={styles.cardSha}>SHA: {entry.commitSha}</span>
-                <span className={styles.cardTime}>{timeAgo(entry.timestamp)}</span>
-              </div>
+
+            <div className={styles.instructionText}>"{item.instruction}"</div>
+
+            <div className={styles.metaRow}>
+              <span>⎇ Branch: <code>{item.branch}</code></span>
+              <span>SHA: <code>{item.commitSha}</code></span>
+              <span>Author: {item.author}</span>
             </div>
+
+            {item.status === 'deployed' && onRollback && (
+              <div className={styles.cardFooter}>
+                <button className={styles.rollbackBtn} onClick={() => onRollback(item.id)}>
+                  ↺ Rollback this Change
+                </button>
+              </div>
+            )}
           </div>
         ))}
       </div>
