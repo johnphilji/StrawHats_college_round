@@ -225,6 +225,118 @@
       "css": "styles.css",
       "cssSelector": ".continue-shopping-link",
       "editable": ["text", "color", "fontSize"]
+    },
+    "product-5-card": {
+      "label": "Product 5 Card",
+      "html": "index.html",
+      "css": "styles.css",
+      "cssSelector": ".product-5-card",
+      "editable": ["backgroundColor", "padding", "borderRadius"]
+    },
+    "product-5-title": {
+      "label": "Product 5 Title",
+      "html": "index.html",
+      "css": "styles.css",
+      "cssSelector": ".product-5-title",
+      "editable": ["text", "color", "fontSize"]
+    },
+    "product-5-price": {
+      "label": "Product 5 Price",
+      "html": "index.html",
+      "css": "styles.css",
+      "cssSelector": ".product-5-price",
+      "editable": ["text", "color", "fontSize"]
+    },
+    "product-5-add-button": {
+      "label": "Product 5 Add Button",
+      "html": "index.html",
+      "css": "styles.css",
+      "cssSelector": ".btn-add-5",
+      "editable": ["text", "backgroundColor", "color", "fontSize", "padding", "borderRadius"]
+    },
+    "product-6-card": {
+      "label": "Product 6 Card",
+      "html": "index.html",
+      "css": "styles.css",
+      "cssSelector": ".product-6-card",
+      "editable": ["backgroundColor", "padding", "borderRadius"]
+    },
+    "product-6-title": {
+      "label": "Product 6 Title",
+      "html": "index.html",
+      "css": "styles.css",
+      "cssSelector": ".product-6-title",
+      "editable": ["text", "color", "fontSize"]
+    },
+    "product-6-price": {
+      "label": "Product 6 Price",
+      "html": "index.html",
+      "css": "styles.css",
+      "cssSelector": ".product-6-price",
+      "editable": ["text", "color", "fontSize"]
+    },
+    "product-6-add-button": {
+      "label": "Product 6 Add Button",
+      "html": "index.html",
+      "css": "styles.css",
+      "cssSelector": ".btn-add-6",
+      "editable": ["text", "backgroundColor", "color", "fontSize", "padding", "borderRadius"]
+    },
+    "product-7-card": {
+      "label": "Product 7 Card",
+      "html": "index.html",
+      "css": "styles.css",
+      "cssSelector": ".product-7-card",
+      "editable": ["backgroundColor", "padding", "borderRadius"]
+    },
+    "product-7-title": {
+      "label": "Product 7 Title",
+      "html": "index.html",
+      "css": "styles.css",
+      "cssSelector": ".product-7-title",
+      "editable": ["text", "color", "fontSize"]
+    },
+    "product-7-price": {
+      "label": "Product 7 Price",
+      "html": "index.html",
+      "css": "styles.css",
+      "cssSelector": ".product-7-price",
+      "editable": ["text", "color", "fontSize"]
+    },
+    "product-7-add-button": {
+      "label": "Product 7 Add Button",
+      "html": "index.html",
+      "css": "styles.css",
+      "cssSelector": ".btn-add-7",
+      "editable": ["text", "backgroundColor", "color", "fontSize", "padding", "borderRadius"]
+    },
+    "product-8-card": {
+      "label": "Product 8 Card",
+      "html": "index.html",
+      "css": "styles.css",
+      "cssSelector": ".product-8-card",
+      "editable": ["backgroundColor", "padding", "borderRadius"]
+    },
+    "product-8-title": {
+      "label": "Product 8 Title",
+      "html": "index.html",
+      "css": "styles.css",
+      "cssSelector": ".product-8-title",
+      "editable": ["text", "color", "fontSize"]
+    },
+    "product-8-price": {
+      "label": "Product 8 Price",
+      "html": "index.html",
+      "css": "styles.css",
+      "cssSelector": ".product-8-price",
+      "editable": ["text", "color", "fontSize"]
+    },
+    "product-8-add-button": {
+      "label": "Product 8 Add Button",
+      "html": "index.html",
+      "css": "styles.css",
+      "cssSelector": ".btn-add-8",
+      "editable": ["text", "backgroundColor", "color", "fontSize", "padding", "borderRadius"]
     }
   }
 }

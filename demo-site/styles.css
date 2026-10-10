@@ -91,10 +91,18 @@ a:focus-visible, button:focus-visible {
 
 .site-nav {
   display: flex;
-  gap: 32px;
+  gap: 24px;
   padding: 12px 24px;
   background-color: var(--primary-blue);
   border-top: 1px solid rgba(255, 255, 255, 0.2);
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.static-nav-link {
+  color: #ffffff;
+  font-size: 14px;
+  font-weight: bold;
 }
 
 .main-content {
@@ -403,6 +411,27 @@ a:focus-visible, button:focus-visible {
   font-weight: bold;
   width: 100%;
 }
+
+.product-5-card { background-color: #ffffff; padding: 16px; border-radius: 0; box-shadow: none; }
+.product-5-title { color: #333333; font-size: 18px; font-weight: bold; margin-bottom: 8px; }
+.product-5-price { color: #666666; font-size: 15px; margin-bottom: 16px; }
+.btn-add-5 { background-color: #efefef; color: #333333; font-size: 14px; padding: 10px 16px; border-radius: 20px; font-weight: bold; width: 100%; }
+
+.product-6-card { background-color: #ffffff; padding: 16px; border-radius: 0; box-shadow: none; }
+.product-6-title { color: #333333; font-size: 18px; font-weight: bold; margin-bottom: 8px; }
+.product-6-price { color: #666666; font-size: 15px; margin-bottom: 16px; }
+.btn-add-6 { background-color: #efefef; color: #333333; font-size: 14px; padding: 10px 16px; border-radius: 20px; font-weight: bold; width: 100%; }
+
+.product-7-card { background-color: #ffffff; padding: 16px; border-radius: 0; box-shadow: none; }
+.product-7-title { color: #333333; font-size: 18px; font-weight: bold; margin-bottom: 8px; }
+.product-7-price { color: #666666; font-size: 15px; margin-bottom: 16px; }
+.btn-add-7 { background-color: #efefef; color: #333333; font-size: 14px; padding: 10px 16px; border-radius: 20px; font-weight: bold; width: 100%; }
+
+.product-8-card { background-color: #ffffff; padding: 16px; border-radius: 0; box-shadow: none; }
+.product-8-title { color: #333333; font-size: 18px; font-weight: bold; margin-bottom: 8px; }
+.product-8-price { color: #666666; font-size: 15px; margin-bottom: 16px; }
+.btn-add-8 { background-color: #efefef; color: #333333; font-size: 14px; padding: 10px 16px; border-radius: 20px; font-weight: bold; width: 100%; }
+
 
 .cart-panel {
   background-color: #ffffff;
