@@ -1,14 +1,16 @@
+import React, { useState, useEffect } from 'react'
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Card } from "@/components/ui/card"
 import { Search, Plus, Globe, Settings, ExternalLink } from "lucide-react"
+import { useNavigate } from "react-router-dom"
 
 export default function WebsitesPage() {
-  const sites = [
-    { name: "Acme Store", host: "shop.demo.local", status: "Healthy", patches: 5, env: "Production", lastUpdated: "2 hours ago" },
-    { name: "Nova Portfolio", host: "portfolio.demo.local", status: "Healthy", patches: 2, env: "Production", lastUpdated: "1 day ago" },
-    { name: "Atlas Docs", host: "docs.demo.local", status: "Warning", patches: 4, env: "Staging", lastUpdated: "3 days ago" },
-  ];
+  const navigate = useNavigate();
+  const [sites, setSites] = useState<any[]>([]);
+  useEffect(() => {
+    fetch('http://localhost:4001/api/sites').then(r => r.json()).then(setSites);
+  }, []);
 
   return (
     <div className="p-8 max-w-7xl mx-auto space-y-6">
@@ -43,7 +45,7 @@ export default function WebsitesPage() {
               </div>
               
               <div className="flex justify-between items-center">
-                <Button size="sm" className="bg-indigo-600 hover:bg-indigo-700">Open Editor</Button>
+                <Button size="sm" className="bg-indigo-600 hover:bg-indigo-700" onClick={() => navigate(`/editor/${site.id}`)}>Open Editor</Button>
                 <Button variant="ghost" size="sm" className="h-8 w-8 p-0"><Settings className="w-4 h-4" /></Button>
               </div>
             </div>

@@ -4,11 +4,7 @@ import { useAppStore } from "../store/appStore"
 import { useEffect } from "react"
 
 export default function AuditPage() {
-  const { auditLogs, refreshAuditLogs } = useAppStore();
-
-  useEffect(() => {
-    refreshAuditLogs();
-  }, []);
+  const auditLogs = useAppStore((state: any) => state.auditLogs);
 
   const getIcon = (action: string) => {
     if (action.includes('Release')) return Zap;
@@ -30,7 +26,7 @@ export default function AuditPage() {
           {auditLogs.length === 0 && (
              <div className="p-8 text-center text-slate-500">No events recorded.</div>
           )}
-          {auditLogs.map(evt => {
+          {auditLogs.map((evt: any) => {
             const Icon = getIcon(evt.action);
             return (
               <div key={evt.id} className="p-4 flex items-start gap-4 hover:bg-slate-50/50">

@@ -6,10 +6,8 @@ import { useNavigate } from "react-router-dom"
 import { useEffect } from "react"
 
 export default function DashboardPage() {
-  const { patches, releases, auditLogs, refreshAuditLogs } = useAppStore();
+  const { patches, releases, auditLogs } = useAppStore();
   const navigate = useNavigate();
-
-  useEffect(() => { refreshAuditLogs() }, []);
 
   const activePatchesCount = patches.length;
   const pendingReviewsCount = patches.filter(p => p.status === 'Ready to Deploy' || p.status === 'Conflict Detected').length;

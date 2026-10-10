@@ -2,7 +2,12 @@ import { captureFingerprint } from './heal.js';
 import { applyOperations } from './dom.js';
 
 let hoveredEl: HTMLElement | null = null;
+let selectedEl: HTMLElement | null = null;
 let outlineEl: HTMLElement | null = null;
+let selectedOutlineEl: HTMLElement | null = null;
+
+// Store original values so we can undo
+const originalValues = new Map<string, { text: string, styles: Record<string, string> }>();
 
 export function initEditorBridge(siteId: string) {
   const DASHBOARD_ORIGIN = 'http://localhost:5173';
@@ -11,15 +16,25 @@ export function initEditorBridge(siteId: string) {
   outlineEl = document.createElement('div');
   outlineEl.style.position = 'fixed';
   outlineEl.style.pointerEvents = 'none';
-  outlineEl.style.border = '2px solid #6366f1';
+  outlineEl.style.border = '2px dashed #6366f1';
   outlineEl.style.backgroundColor = 'rgba(99, 102, 241, 0.1)';
-  outlineEl.style.zIndex = '999999';
+  outlineEl.style.zIndex = '999998';
   outlineEl.style.display = 'none';
   document.body.appendChild(outlineEl);
 
+  // Create selected outline
+  selectedOutlineEl = document.createElement('div');
+  selectedOutlineEl.style.position = 'fixed';
+  selectedOutlineEl.style.pointerEvents = 'none';
+  selectedOutlineEl.style.border = '2px solid #4f46e5';
+  selectedOutlineEl.style.backgroundColor = 'rgba(79, 70, 229, 0.2)';
+  selectedOutlineEl.style.zIndex = '999999';
+  selectedOutlineEl.style.display = 'none';
+  document.body.appendChild(selectedOutlineEl);
+
   document.addEventListener('mouseover', (e) => {
     const target = e.target as HTMLElement;
-    if (target === outlineEl || target.tagName === 'BODY' || target.tagName === 'HTML') return;
+    if (target === outlineEl || target === selectedOutlineEl || target.tagName === 'BODY' || target.tagName === 'HTML') return;
     hoveredEl = target;
     const rect = target.getBoundingClientRect();
     outlineEl!.style.display = 'block';
@@ -34,6 +49,25 @@ export function initEditorBridge(siteId: string) {
     if (!hoveredEl) return;
     e.preventDefault();
     e.stopPropagation();
+
+    selectedEl = target;
+    const rect = target.getBoundingClientRect();
+    selectedOutlineEl!.style.display = 'block';
+    selectedOutlineEl!.style.top = rect.top + 'px';
+    selectedOutlineEl!.style.left = rect.left + 'px';
+    selectedOutlineEl!.style.width = rect.width + 'px';
+    selectedOutlineEl!.style.height = rect.height + 'px';
+
+    // Save original state if not saved
+    if (!originalValues.has(target.outerHTML)) {
+       originalValues.set(target.outerHTML, {
+         text: target.textContent || '',
+         styles: {
+           color: target.style.color,
+           backgroundColor: target.style.backgroundColor
+         }
+       });
+    }
 
     // Compute minimal selector
     let selector = target.tagName.toLowerCase();
@@ -67,9 +101,18 @@ export function initEditorBridge(siteId: string) {
     if (e.origin !== DASHBOARD_ORIGIN) return;
     
     if (e.data.type === 'PREVIEW_OPS') {
-       // Re-apply preview operations
-       // We should ideally reset first, but for the hackathon prototype applying directly is fine
        const ops = e.data.payload.operations;
+       
+       // First, reset all elements we know about to their original state to support Undo
+       if (selectedEl) {
+          const original = originalValues.get(selectedEl.outerHTML);
+          if (original) {
+             selectedEl.textContent = original.text;
+             selectedEl.style.color = original.styles.color;
+             selectedEl.style.backgroundColor = original.styles.backgroundColor;
+          }
+       }
+
        // Mock apply
        ops.forEach((op: any) => {
           const el = document.querySelector(op.selector) as HTMLElement;

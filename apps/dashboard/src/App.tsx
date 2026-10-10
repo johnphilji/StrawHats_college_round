@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import AppShell from './components/layout/AppShell';
 import DashboardPage from './pages/DashboardPage';
@@ -9,8 +10,15 @@ import ConflictsPage from './pages/ConflictsPage';
 import ReleasesPage from './pages/ReleasesPage';
 import TestsPage from './pages/TestsPage';
 import AuditPage from './pages/AuditPage';
+import { useAppStore } from './store/appStore';
 
 function App() {
+  const init = useAppStore((state: any) => state.init);
+  
+  useEffect(() => {
+    init();
+  }, [init]);
+
   return (
     <BrowserRouter>
       <Routes>
