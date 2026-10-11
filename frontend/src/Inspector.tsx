@@ -1,16 +1,24 @@
 import { useState } from 'react';
 import styles from './Inspector.module.css';
 import type { SelectedComponent, CodeChange } from './types';
-import { delay } from './api';
-import { requestEditProposal, type EditProposal } from './api-client';
+import {
+  createPatchPullRequest,
+  createProjectPatch,
+  generateProjectPatch,
+  requestEditProposal,
+  updateProjectPatchStatus,
+  type EditProposal,
+} from './api-client';
 
 interface InspectorProps {
   selected: SelectedComponent | null;
   onClear: () => void;
   activeChange: CodeChange | null;
   onChangeUpdate: (change: CodeChange | null) => void;
-  onReleaseSuccess: (change: CodeChange) => void;
   onOpenConflicts?: () => void;
+  projectId?: string;
+  repositoryIdentifier?: string;
+  productionBranch?: string;
 }
 
 export default function Inspector({
@@ -18,8 +26,10 @@ export default function Inspector({
   onClear,
   activeChange,
   onChangeUpdate,
-  onReleaseSuccess,
   onOpenConflicts,
+  projectId,
+  repositoryIdentifier,
+  productionBranch,
 }: InspectorProps) {
   const [instruction, setInstruction] = useState('');
   const [isGenerating, setIsGenerating] = useState(false);
@@ -52,27 +62,56 @@ export default function Inspector({
     setRequestError(null);
 
     try {
-      // Real backend request: resolve → source → (simulated) generate → validate.
-      const proposal: EditProposal = await requestEditProposal(selected.componentId, instruction);
-      const change: CodeChange = {
-        editId: `edit_${Date.now()}`,
-        componentId: proposal.componentId,
-        componentLabel: selected.label,
-        instruction,
-        branch: 'local/preview (uncommitted)',
-        commitSha: 'uncommitted',
-        status: 'review_diff',
-        diff: proposal.diff,
-        modifiedFiles: proposal.changedFiles,
-        explanation: proposal.summary,
-        provider: proposal.provider,
-        simulated: proposal.simulated,
-        validationErrors: proposal.validation.errors,
-        validationWarnings: [...proposal.validation.warnings, ...proposal.providerWarnings],
-        targetUnchanged: proposal.targetUnchanged,
-        isolatedPreviewApplied: proposal.isolatedPreviewApplied,
-        previewApplied: {},
-      };
+      let change: CodeChange;
+      if (projectId && repositoryIdentifier) {
+        const patch = await createProjectPatch(projectId, instruction);
+        const proposal = await generateProjectPatch(projectId, patch.id, selected.componentId);
+        change = {
+          editId: patch.id,
+          patchId: patch.id,
+          projectId,
+          repositoryIdentifier,
+          productionBranch,
+          generationId: proposal.generationId,
+          componentId: proposal.componentId,
+          componentLabel: selected.label,
+          instruction,
+          branch: proposal.branchName,
+          commitSha: proposal.headCommitSha,
+          status: 'review_diff',
+          diff: proposal.diff,
+          modifiedFiles: proposal.validation.changedFiles,
+          explanation: proposal.summary,
+          provider: proposal.provider,
+          simulated: false,
+          validationErrors: proposal.validation.errors,
+          validationWarnings: proposal.validation.warnings,
+          targetUnchanged: true,
+          isolatedPreviewApplied: false,
+          previewApplied: {},
+        };
+      } else {
+        const proposal: EditProposal = await requestEditProposal(selected.componentId, instruction);
+        change = {
+          editId: `edit_${Date.now()}`,
+          componentId: proposal.componentId,
+          componentLabel: selected.label,
+          instruction,
+          branch: 'local/preview (uncommitted)',
+          commitSha: 'uncommitted',
+          status: 'review_diff',
+          diff: proposal.diff,
+          modifiedFiles: proposal.changedFiles,
+          explanation: proposal.summary,
+          provider: proposal.provider,
+          simulated: proposal.simulated,
+          validationErrors: proposal.validation.errors,
+          validationWarnings: [...proposal.validation.warnings, ...proposal.providerWarnings],
+          targetUnchanged: proposal.targetUnchanged,
+          isolatedPreviewApplied: proposal.isolatedPreviewApplied,
+          previewApplied: {},
+        };
+      }
       onChangeUpdate(change);
     } catch (err) {
       // Preserve the selected component and prompt so the user can retry.
@@ -82,26 +121,39 @@ export default function Inspector({
     }
   };
 
-  const handleApproveBranch = () => {
+  const handleApproveBranch = async () => {
     if (!activeChange) return;
-    onChangeUpdate({
-      ...activeChange,
-      status: 'applied_branch',
-    });
+    setRequestError(null);
+    try {
+      if (activeChange.projectId && activeChange.patchId) {
+        await updateProjectPatchStatus(activeChange.projectId, activeChange.patchId, 'APPROVED');
+      }
+      onChangeUpdate({ ...activeChange, status: 'applied_branch' });
+    } catch (err) {
+      setRequestError(err instanceof Error ? err.message : 'Could not approve this patch.');
+    }
   };
 
-  const handleApproveRelease = async () => {
-    if (!activeChange) return;
+  const handleCreatePullRequest = async () => {
+    if (!activeChange?.projectId || !activeChange.patchId) {
+      setRequestError('Connect this editor to an authenticated GitHub project before creating a pull request.');
+      return;
+    }
     setIsDeploying(true);
-    await delay(1000);
-
-    const deployedChange: CodeChange = {
-      ...activeChange,
-      status: 'deployed',
-    };
-    onChangeUpdate(deployedChange);
-    onReleaseSuccess(deployedChange);
-    setIsDeploying(false);
+    setRequestError(null);
+    try {
+      const pullRequest = await createPatchPullRequest(activeChange.projectId, activeChange.patchId);
+      onChangeUpdate({
+        ...activeChange,
+        status: 'pull_request',
+        pullRequestNumber: pullRequest.number,
+        pullRequestUrl: pullRequest.url,
+      });
+    } catch (err) {
+      setRequestError(err instanceof Error ? err.message : 'Could not create the pull request.');
+    } finally {
+      setIsDeploying(false);
+    }
   };
 
   const handleReset = () => {
@@ -205,6 +257,7 @@ export default function Inspector({
       )}
 
       <div className={styles.body}>
+        {requestError && <div className={styles.errorAlert} role="alert">{requestError}</div>}
         {/* STEP 1: Describe the change (Prompt Input) */}
         {!activeChange && !isGenerating && (
           <div className={styles.promptSection}>
@@ -237,13 +290,6 @@ export default function Inspector({
               {isGenerating ? 'Generating…' : 'Generate Patch'}
             </button>
 
-            {requestError && (
-              <div className={styles.errorAlert} role="alert">
-                <strong>Patch generation failed.</strong>
-                <div>{requestError}</div>
-                <div className={styles.errorHint}>Your selection and prompt are preserved — fix the issue and retry.</div>
-              </div>
-            )}
           </div>
         )}
 
@@ -332,8 +378,8 @@ export default function Inspector({
             </div>
 
             <div className={styles.actionButtons}>
-              <button className={styles.approveBtn} onClick={handleApproveBranch}>
-                Apply to Branch
+              <button className={styles.approveBtn} onClick={handleApproveBranch} disabled={!activeChange.patchId}>
+                {activeChange.patchId ? 'Approve Patch' : 'Connect a GitHub project to commit'}
               </button>
               <button className={styles.discardBtn} onClick={() => onChangeUpdate(null)}>
                 Discard
@@ -366,22 +412,30 @@ export default function Inspector({
             </div>
 
             <p className={styles.previewNotice}>
-              The proposal was validated against an isolated temp copy of the source file.
-              The live website and the repository are unchanged until an explicit apply step.
+              {activeChange.patchId
+                ? 'The validated change is committed to an isolated patch branch. The production branch has not been changed.'
+                : 'This local proposal is simulated/preview-only. It has not been committed to a Git branch.'}
             </p>
 
             <div className={styles.releaseActions}>
-              <button
-                className={styles.deployBtn}
-                onClick={handleApproveRelease}
-                disabled={isDeploying}
-              >
-                {isDeploying ? 'Merging into main & Deploying...' : 'Approve Release & Merge into Main'}
+              <button className={styles.deployBtn} onClick={handleCreatePullRequest} disabled={isDeploying || !activeChange.patchId}>
+                {isDeploying ? 'Creating pull request…' : 'Create Pull Request'}
               </button>
               <button className={styles.discardBtn} onClick={() => onChangeUpdate(null)}>
                 Cancel
               </button>
             </div>
+          </div>
+        )}
+
+        {activeChange && activeChange.status === 'pull_request' && (
+          <div className={styles.deployedSection}>
+            <div className={styles.successAlert}>
+              <strong>Pull request #{activeChange.pullRequestNumber} is open for review.</strong>
+            </div>
+            {activeChange.pullRequestUrl && <a href={activeChange.pullRequestUrl} target="_blank" rel="noreferrer">Open pull request on GitHub</a>}
+            <p className={styles.previewNotice}>This does not merge or deploy the change. Review and deployment remain separate workflow steps.</p>
+            <button className={styles.anotherBtn} onClick={handleReset}>Make Another Change</button>
           </div>
         )}
 

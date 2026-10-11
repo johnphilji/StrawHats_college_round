@@ -1,5 +1,6 @@
 import type { ResolvedComponentContext } from '../../types/component.types';
 import { AppError } from '../../shared/errors/AppError';
+import { generatePatchFromGroq } from './groq';
 
 /**
  * PATCHWORK patch-provider abstraction (Phase 5).
@@ -18,7 +19,7 @@ import { AppError } from '../../shared/errors/AppError';
  * credentials are present. No new API key or dependency is introduced here.
  */
 
-export type PatchProviderName = 'mock';
+export type PatchProviderName = 'mock' | 'groq';
 
 export interface PatchProviderInput {
   componentId: string;
@@ -39,6 +40,8 @@ export interface PatchProviderOutput {
   summary: string;
   /** Non-fatal notes (e.g. "mock mode, no model called"). */
   warnings: string[];
+  /** Provider/configuration failures that prevent a proposal. */
+  errors?: string[];
 }
 
 export interface PatchProvider {
@@ -47,6 +50,7 @@ export interface PatchProvider {
 }
 
 const MAX_INSTRUCTION_NOTE = 200;
+const MAX_GROQ_SOURCE_CHARS = 30_000;
 
 /** Make user text safe to embed inside a JSX block comment. */
 export function sanitizeInstructionNote(instruction: string): string {
@@ -136,6 +140,66 @@ export class MockPatchProvider implements PatchProvider {
   }
 }
 
+export class GroqPatchProvider implements PatchProvider {
+  readonly name = 'groq';
+
+  async generate(input: PatchProviderInput): Promise<PatchProviderOutput> {
+    const { context } = input;
+    if (context.sourceCode.length > MAX_GROQ_SOURCE_CHARS) {
+      return {
+        provider: this.name,
+        simulated: false,
+        diff: '',
+        changedFiles: [],
+        summary: '',
+        warnings: [],
+        errors: [`Source file exceeds the ${MAX_GROQ_SOURCE_CHARS}-character generation limit.`],
+      };
+    }
+
+    const componentContext = JSON.stringify({
+      authorizedFilePath: context.filePath,
+      componentName: context.componentName,
+      editableScope: context.editableScope,
+      allowedOperations: context.allowedOperations,
+      description: context.description,
+      framework: context.framework,
+      route: context.route,
+      dataSource: context.dataSource,
+      notes: context.notes,
+      currentSource: context.sourceCode,
+    });
+    const result = await generatePatchFromGroq({
+      componentId: input.componentId,
+      instruction: input.instruction,
+      componentContext,
+    });
+
+    if (result.status !== 'success') {
+      return {
+        provider: this.name,
+        simulated: false,
+        diff: '',
+        changedFiles: [],
+        summary: '',
+        warnings: result.warnings,
+        errors: result.errors.length > 0 ? result.errors : [result.message],
+      };
+    }
+
+    return {
+      provider: this.name,
+      simulated: false,
+      diff: result.diff,
+      // Never trust the model's changedFiles list; the diff validator verifies
+      // the actual file headers against this server-resolved path.
+      changedFiles: [context.filePath],
+      summary: result.summary ?? 'Generated a targeted patch.',
+      warnings: result.warnings,
+    };
+  }
+}
+
 /**
  * Select the patch provider. Today this always resolves to the explicit mock
  * so local development never implies real generation. A future remote adapter
@@ -146,7 +210,8 @@ export class MockPatchProvider implements PatchProvider {
 export function getPatchProvider(): PatchProvider {
   const name = (process.env.LLM_PROVIDER ?? 'mock').trim().toLowerCase() || 'mock';
   if (name === 'mock') return new MockPatchProvider();
-  throw new AppError(`Unknown patch provider '${name}'. Only 'mock' is configured; a real LLM adapter is not integrated yet.`, {
+  if (name === 'groq') return new GroqPatchProvider();
+  throw new AppError(`Unknown patch provider '${name}'. Configured providers are: mock, groq.`, {
     statusCode: 500,
     code: 'CONFIGURATION_ERROR',
   });

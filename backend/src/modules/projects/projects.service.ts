@@ -51,4 +51,11 @@ export const projectsService = {
     }
     return project;
   },
+
+  async updateProject(id: string, ownerId: string, data: Partial<Omit<CreateProjectData, 'ownerId'>>) {
+    if (!isPrismaConfigured()) throw new AppError('Database not configured', { statusCode: 503, code: 'CONFIGURATION_ERROR' });
+    const project = await projectsRepository.updateOwned(id, ownerId, data);
+    if (!project) throw new AppError('Project not found', { statusCode: 404, code: 'NOT_FOUND' });
+    return project;
+  },
 };

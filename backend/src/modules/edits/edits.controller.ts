@@ -17,8 +17,8 @@ export const editsController = {
    * (same gate as the component source preview endpoint).
    */
   async generate(req: Request, res: Response) {
-    if (process.env.NODE_ENV === 'production' && !req.user) {
-      throw forbidden('Edit generation requires authentication in production');
+    if ((process.env.NODE_ENV === 'production' || process.env.LLM_PROVIDER === 'groq') && !req.user) {
+      throw forbidden('Edit generation requires authentication when a paid/secret-backed provider is enabled.');
     }
     const { componentId, instruction } = req.body as {
       componentId: string;

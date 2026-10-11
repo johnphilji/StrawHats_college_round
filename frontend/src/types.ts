@@ -2,6 +2,8 @@
 
 export interface ConnectedWebsite {
   id: string;
+  projectId?: string;
+  repositoryIdentifier?: string;
   name: string;
   tagline: string;
   repoUrl: string;
@@ -77,11 +79,19 @@ export type EditStatus =
   | 'review_diff'
   | 'applied_branch'
   | 'deploying'
+  | 'pull_request'
   | 'deployed'
   | 'rolled_back';
 
 export interface CodeChange {
   editId: string;
+  patchId?: string;
+  projectId?: string;
+  repositoryIdentifier?: string;
+  productionBranch?: string;
+  generationId?: string;
+  pullRequestNumber?: number;
+  pullRequestUrl?: string;
   componentId: string;
   componentLabel: string;
   instruction: string;

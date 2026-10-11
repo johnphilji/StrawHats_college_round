@@ -12,7 +12,7 @@ vi.mock('../../src/lib/supabase', () => ({
 }));
 vi.mock('../../src/modules/patches/patches.service', () => ({
   patchesService: {
-    create: vi.fn(), list: vi.fn(), get: vi.fn(), updateStatus: vi.fn(),
+    create: vi.fn(), list: vi.fn(), get: vi.fn(), updateStatus: vi.fn(), createPullRequest: vi.fn(),
   },
 }));
 
@@ -95,6 +95,35 @@ describe('Patch API', () => {
     expect(res.body.data).toMatchObject({ status: 'APPROVED', reviewedBy: 'user-1' });
     expect(res.body.data).not.toHaveProperty('validationDetails');
     expect(patchesService.updateStatus).toHaveBeenCalledWith('project-1', 'patch-1', 'user-1', 'APPROVED', 'Looks good');
+  });
+
+  it('creates a pull request only through the owned approved patch service', async () => {
+    vi.mocked(patchesService.createPullRequest).mockResolvedValue({
+      number: 14, url: 'https://github.com/acme/site/pull/14', state: 'open', created: true,
+      patch: patch({ status: 'APPROVED', pullRequestNumber: 14 }),
+    } as never);
+    const res = await request(app).post('/api/projects/project-1/patches/patch-1/pull-request')
+      .set('Authorization', 'Bearer valid').send({});
+
+    expect(res.status).toBe(201);
+    expect(res.body.data.number).toBe(14);
+    expect(res.body.data.patch.pullRequestNumber).toBe(14);
+    expect(patchesService.createPullRequest).toHaveBeenCalledWith('project-1', 'patch-1', expect.objectContaining({ id: 'user-1' }));
+  });
+
+  it('returns only the server-created generation correlation ID when generation starts', async () => {
+    const generationId = 'b87e8488-986c-4c06-bd12-bcc2fc49d928';
+    vi.mocked(patchesService.updateStatus).mockResolvedValue(patch({
+      status: 'GENERATING',
+      validationDetails: { workflow: { generationId, outcome: 'PENDING' }, validation: null, privateLog: 'hidden' },
+    }) as never);
+    const res = await request(app).patch('/api/projects/project-1/patches/patch-1/status')
+      .set('Authorization', 'Bearer valid').send({ status: 'GENERATING' });
+
+    expect(res.status).toBe(200);
+    expect(res.body.data.generationId).toBe(generationId);
+    expect(res.body.data).not.toHaveProperty('validationDetails');
+    expect(JSON.stringify(res.body)).not.toContain('privateLog');
   });
 
   it('rejects a status payload that could claim a workflow result', async () => {

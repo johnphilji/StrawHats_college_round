@@ -1,48 +1,114 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import styles from './WebsitesView.module.css';
 import type { ConnectedWebsite } from './types';
 import { MOCK_WEBSITES } from './api';
+import {
+  beginGitHubInstallation,
+  createProject,
+  fetchGitHubRepositories,
+  fetchProjects,
+  type GitHubRepository,
+  type ProjectRecord,
+} from './api-client';
 
 interface WebsitesViewProps {
   onSelectWebsite: (website: ConnectedWebsite) => void;
+  isAuthenticated: boolean;
+  onSignIn: () => void;
 }
 
-export default function WebsitesView({ onSelectWebsite }: WebsitesViewProps) {
+function projectToWebsite(project: ProjectRecord, repository?: GitHubRepository): ConnectedWebsite {
+  const ownerAndName = project.repositoryUrl?.match(/github\.com[:/]([^/]+)\/([^/.]+)/i);
+  return {
+    id: project.id,
+    projectId: project.id,
+    repositoryIdentifier: project.repositoryIdentifier ?? undefined,
+    name: project.name,
+    tagline: project.description ?? 'Connected GitHub repository',
+    repoUrl: project.repositoryUrl ?? repository?.url ?? '',
+    repoOwner: repository?.owner ?? ownerAndName?.[1] ?? 'github',
+    repoName: repository?.name ?? ownerAndName?.[2] ?? project.name,
+    branch: project.productionBranch,
+    previewUrl: repository?.url ?? project.repositoryUrl ?? '',
+    productionUrl: repository?.url ?? project.repositoryUrl ?? '',
+    status: 'connected',
+    mode: 'managed',
+    runtimeLoaderInstalled: false,
+    lastModified: 'Connected',
+    componentCount: 0,
+    category: 'Ecommerce',
+    code: project.name.slice(0, 2).toUpperCase(),
+    framework: 'GitHub repository',
+    activeRelease: 'No release',
+    activePatchesCount: 0,
+  };
+}
+
+export default function WebsitesView({ onSelectWebsite, isAuthenticated, onSignIn }: WebsitesViewProps) {
   const [websites, setWebsites] = useState<ConnectedWebsite[]>(MOCK_WEBSITES);
   const [showModal, setShowModal] = useState(false);
   const [name, setName] = useState('');
-  const [repoUrl, setRepoUrl] = useState('');
+  const [selectedRepositoryId, setSelectedRepositoryId] = useState('');
+  const [repositories, setRepositories] = useState<GitHubRepository[]>([]);
+  const [requestError, setRequestError] = useState<string | null>(null);
+  const [isConnecting, setIsConnecting] = useState(false);
 
-  const handleConnect = (e: React.FormEvent) => {
+  useEffect(() => {
+    if (!isAuthenticated) return;
+    const controller = new AbortController();
+    fetchProjects(controller.signal)
+      .then((projects) => {
+        const projectSites = projects.map((project) => projectToWebsite(project));
+        setWebsites([...MOCK_WEBSITES, ...projectSites]);
+      })
+      .catch((error: unknown) => {
+        if (!controller.signal.aborted) setRequestError(error instanceof Error ? error.message : 'Could not load projects.');
+      });
+    fetchGitHubRepositories(controller.signal)
+      .then((result) => setRepositories(result.repositories))
+      .catch(() => {
+        if (!controller.signal.aborted) setRepositories([]);
+      });
+    return () => controller.abort();
+  }, [isAuthenticated]);
+
+  const handleConnect = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!name.trim()) return;
+    if (!isAuthenticated) {
+      onSignIn();
+      return;
+    }
+    const repository = repositories.find((item) => String(item.id) === selectedRepositoryId);
+    if (!name.trim() || !repository) return;
+    setIsConnecting(true);
+    setRequestError(null);
+    try {
+      const project = await createProject({
+        name: name.trim(),
+        repositoryUrl: repository.url,
+        repositoryIdentifier: String(repository.id),
+        productionBranch: repository.defaultBranch,
+      });
+      const site = projectToWebsite(project, repository);
+      setWebsites((current) => [site, ...current.filter((item) => item.projectId !== site.projectId)]);
+      setShowModal(false);
+      setName('');
+      setSelectedRepositoryId('');
+      onSelectWebsite(site);
+    } catch (error) {
+      setRequestError(error instanceof Error ? error.message : 'Could not connect this repository.');
+    } finally {
+      setIsConnecting(false);
+    }
+  };
 
-    const newSite: ConnectedWebsite = {
-      id: `site_${Date.now()}`,
-      name,
-      tagline: `Connected repository ${repoUrl || 'custom'}`,
-      repoUrl: repoUrl || 'https://github.com/organization/new-site.git',
-      repoOwner: 'johnphilji',
-      repoName: name.toLowerCase().replace(/\s+/g, '-'),
-      branch: 'main',
-      previewUrl: 'http://localhost:3000',
-      productionUrl: `https://${name.toLowerCase().replace(/\s+/g, '-')}.patchwork.dev`,
-      status: 'connected',
-      mode: 'managed',
-      runtimeLoaderInstalled: true,
-      lastModified: 'Just now',
-      componentCount: 8,
-      category: 'Ecommerce',
-      code: name.slice(0, 2).toUpperCase(),
-      framework: 'HTML / CSS / JS',
-      activeRelease: 'v1.0.0',
-      activePatchesCount: 0,
-    };
-
-    setWebsites([newSite, ...websites]);
-    setShowModal(false);
-    setName('');
-    setRepoUrl('');
+  const handleInstallGitHubApp = async () => {
+    try {
+      const { url } = await beginGitHubInstallation();
+      window.location.assign(url);
+    } catch (error) {
+      setRequestError(error instanceof Error ? error.message : 'Could not start GitHub App installation.');
+    }
   };
 
   return (
@@ -113,6 +179,13 @@ export default function WebsitesView({ onSelectWebsite }: WebsitesViewProps) {
             </div>
 
             <form onSubmit={handleConnect} className={styles.form}>
+              {requestError && <p className={styles.connectionError} role="alert">{requestError}</p>}
+              {!isAuthenticated && (
+                <div className={styles.field}>
+                  <span className={styles.label}>Sign in with GitHub to connect an owned repository.</span>
+                  <button type="button" className={styles.submitBtn} onClick={onSignIn}>Sign in with GitHub</button>
+                </div>
+              )}
               <div className={styles.field}>
                 <label className={styles.label}>Website Name</label>
                 <input
@@ -125,23 +198,33 @@ export default function WebsitesView({ onSelectWebsite }: WebsitesViewProps) {
                 />
               </div>
 
-              <div className={styles.field}>
-                <label className={styles.label}>Git Repository URL</label>
-                <input
-                  type="url"
-                  placeholder="https://github.com/johnphilji/demo-sites.git"
-                  value={repoUrl}
-                  onChange={e => setRepoUrl(e.target.value)}
-                  className={styles.input}
-                />
-              </div>
+              {isAuthenticated && repositories.length > 0 ? (
+                <div className={styles.field}>
+                  <label className={styles.label} htmlFor="github-repository">GitHub repository</label>
+                  <select
+                    id="github-repository"
+                    className={styles.input}
+                    value={selectedRepositoryId}
+                    onChange={(event) => setSelectedRepositoryId(event.target.value)}
+                    required
+                  >
+                    <option value="">Select a repository</option>
+                    {repositories.map((repository) => <option key={repository.id} value={repository.id}>{repository.fullName}</option>)}
+                  </select>
+                </div>
+              ) : isAuthenticated ? (
+                <div className={styles.field}>
+                  <span className={styles.label}>Install the PATCHWORK GitHub App to list repositories.</span>
+                  <button type="button" className={styles.cancelBtn} onClick={() => void handleInstallGitHubApp()}>Install GitHub App</button>
+                </div>
+              ) : null}
 
               <div className={styles.modalActions}>
                 <button type="button" className={styles.cancelBtn} onClick={() => setShowModal(false)}>
                   Cancel
                 </button>
-                <button type="submit" className={styles.submitBtn}>
-                  Connect Website
+                <button type="submit" className={styles.submitBtn} disabled={!isAuthenticated || !selectedRepositoryId || isConnecting}>
+                  {isConnecting ? 'Connecting…' : 'Connect Website'}
                 </button>
               </div>
             </form>
