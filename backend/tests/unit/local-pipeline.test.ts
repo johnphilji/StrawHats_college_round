@@ -250,6 +250,25 @@ describe('validatePatchDiff', () => {
     expect(result.valid).toBe(false);
     expect(result.errors.join(' ')).toMatch(/mismatch/);
   });
+
+  it('accepts a diff with bare @@ and aligns hunk with source', () => {
+    const bareDiff = [
+      `--- a/${file}`,
+      `+++ b/${file}`,
+      '@@',
+      '-      <h1 data-patchwork-id="hero-heading">Persia Darbar</h1>',
+      '+      <h1 data-patchwork-id="hero-heading" style={{ color: "var(--maroon)" }}>Persia Darbar</h1>',
+      '',
+    ].join('\n');
+    const result = validatePatchDiff(bareDiff, file, HERO_SOURCE);
+    expect(result.valid).toBe(true);
+    expect(result.errors).toEqual([]);
+    const { parsed } = parseUnifiedDiff(bareDiff, HERO_SOURCE);
+    expect(parsed).toBeDefined();
+    expect(parsed!.hunks[0].oldStart).toBeGreaterThan(0);
+    const patched = applyParsedDiff(HERO_SOURCE, parsed!);
+    expect(patched).toContain('var(--maroon)');
+  });
 });
 
 describe('EditOrchestrationService', () => {

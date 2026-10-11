@@ -57,8 +57,9 @@ export function buildGroqPrompt(input: GroqPatchRequest): string {
     '  - You may only modify the mapped component file. Prefer existing classes; when a visual change needs a value, express it with a CSS variable reference or a minimal inline style so the change stays within this single file.',
     '  - Never introduce unrelated colors, fonts, images, external assets, or new dependencies.',
     '- Return only JSON with fields: diff, changedFiles, summary.',
+    '- The diff must be a valid unified diff with standard hunk headers, e.g. @@ -14,2 +14,2 @@ with exact line numbers from the component context.',
     'JSON format example:',
-    '{"diff":"--- a/src/components/CheckoutButton.tsx\\n+++ b/src/components/CheckoutButton.tsx\\n@@\\n- Checkout\\n+ Continue to Payment","changedFiles":["src/components/CheckoutButton.tsx"],"summary":"Updated checkout CTA copy."}',
+    '{"diff":"--- a/src/components/Hero.jsx\\n+++ b/src/components/Hero.jsx\\n@@ -14,1 +14,1 @@\\n- <h1 className=\\"hero__title\\">Old Title</h1>\\n+ <h1 className=\\"hero__title\\">New Title</h1>","changedFiles":["src/components/Hero.jsx"],"summary":"Updated hero heading."}',
     'Only return JSON, no markdown fences, no prose outside the JSON object.',
   ];
 

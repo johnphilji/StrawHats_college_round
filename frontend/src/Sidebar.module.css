@@ -1,7 +1,8 @@
 .sidebar {
-  width: 236px;
+  width: var(--sidebar-w, 224px);
+  min-width: 216px;
   background: #ffffff;
-  border-right: 1px solid var(--border-default);
+  border-right: 1px solid #e2e8f0;
   display: flex;
   flex-direction: column;
   flex-shrink: 0;
@@ -9,212 +10,163 @@
   user-select: none;
 }
 
-.brand {
-  padding: 16px 18px;
+/* macOS-style Window Header Dots matching Photo 2 */
+.windowHeader {
+  padding: 16px 16px 14px 16px;
   display: flex;
   align-items: center;
-  gap: 10px;
-  border-bottom: 1px solid var(--border-subtle);
-  cursor: pointer;
-  transition: background 0.15s;
+  justify-content: space-between;
 }
 
-.brand:hover {
-  background: var(--bg-hover);
-}
-
-.logoMark {
-  width: 32px;
-  height: 32px;
-  border-radius: var(--radius-sm);
-  background: #2563eb;
-  color: #ffffff;
+.windowDots {
   display: flex;
   align-items: center;
-  justify-content: center;
+  gap: 7px;
 }
 
-.brandInfo {
-  display: flex;
-  flex-direction: column;
+.dotRed {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #ef4444;
+  display: inline-block;
 }
 
-.brandName {
-  font-size: 13.5px;
-  font-weight: 800;
-  letter-spacing: -0.01em;
-  color: var(--text-primary);
+.dotYellow {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #f59e0b;
+  display: inline-block;
 }
 
-.brandTagline {
-  font-size: 11px;
-  color: var(--text-muted);
+.dotGreen {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #10b981;
+  display: inline-block;
 }
 
-/* Active site card */
-.currentSiteCard {
-  margin: 12px 14px;
-  padding: 8px 10px;
-  background: var(--bg-base);
-  border: 1px solid var(--border-default);
-  border-radius: var(--radius-md);
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  cursor: pointer;
-  transition: all 0.15s;
-}
-
-.currentSiteCard:hover {
-  background: var(--bg-hover);
-  border-color: #93c5fd;
-}
-
-.siteMonogram {
-  width: 26px;
-  height: 26px;
-  border-radius: 4px;
-  background: #1e293b;
-  color: #ffffff;
-  font-family: var(--font-mono);
-  font-size: 11px;
-  font-weight: 700;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.siteMeta {
-  flex: 1;
-  min-width: 0;
-}
-
-.siteName {
-  font-size: 12px;
-  font-weight: 700;
-  color: var(--text-primary);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.siteRepo {
-  font-size: 10.5px;
-  color: var(--text-muted);
-  font-family: var(--font-mono);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-/* Nav */
+/* Navigation List (Clean text only, no icons, matching Photo 2) */
 .nav {
-  padding: 8px 10px;
   display: flex;
   flex-direction: column;
-  gap: 2px;
-}
-
-.navGroupLabel {
-  font-size: 9.5px;
-  font-weight: 700;
-  letter-spacing: 0.06em;
-  color: var(--text-muted);
-  padding: 4px 8px;
+  padding: 0 10px;
+  gap: 3px;
 }
 
 .navBtn {
   display: flex;
   align-items: center;
-  gap: 10px;
-  padding: 7px 10px;
-  background: transparent;
-  border: 1px solid transparent;
-  border-radius: var(--radius-sm);
-  font-size: 12.5px;
-  font-weight: 500;
-  color: var(--text-secondary);
-  cursor: pointer;
-  transition: all 0.15s;
-  text-align: left;
+  justify-content: space-between;
   width: 100%;
+  padding: 8px 12px;
+  border-radius: 8px;
+  border: none;
+  background: transparent;
+  font-family: var(--font-sans);
+  font-size: 13.5px;
+  font-weight: 500;
+  color: #334155;
+  cursor: pointer;
+  text-align: left;
+  transition: all 0.12s ease;
 }
 
 .navBtn:hover {
-  background: var(--bg-hover);
-  color: var(--text-primary);
+  background: #f8fafc;
+  color: #0f172a;
 }
 
 .navBtnActive {
-  background: #eff6ff;
-  color: #1d4ed8;
+  background: #f1f5f9;
+  color: #0f172a;
   font-weight: 600;
-  border-color: #bfdbfe;
-}
-
-.navIcon {
-  width: 16px;
-  height: 16px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: inherit;
 }
 
 .navLabel {
   flex: 1;
+  white-space: nowrap;
 }
 
-.navBadgeAlert {
-  font-size: 10px;
+/* Badges matching Photo 2 */
+.badgeAmber {
+  font-size: 11px;
   font-weight: 700;
-  padding: 1px 6px;
-  border-radius: 99px;
-  background: #fef2f2;
-  color: #dc2626;
-  border: 1px solid #fee2e2;
+  background: #fef3c7;
+  color: #d97706;
+  padding: 2px 8px;
+  border-radius: 9999px;
+  line-height: 1.2;
 }
 
-.navBadgeNeutral {
-  font-size: 10px;
-  font-weight: 600;
+.badgeMint {
+  font-size: 11px;
+  font-weight: 700;
+  background: #dcfce7;
+  color: #059669;
+  padding: 2px 8px;
+  border-radius: 9999px;
+  line-height: 1.2;
+}
+
+.badgeNeutral {
+  font-size: 10.5px;
+  font-family: var(--font-mono);
+  background: #f1f5f9;
+  color: #64748b;
   padding: 1px 6px;
   border-radius: 4px;
-  background: var(--bg-base);
-  color: var(--text-muted);
-  border: 1px solid var(--border-default);
-  font-family: var(--font-mono);
 }
 
 .spacer {
   flex: 1;
 }
 
-/* Footer */
+/* Subtle target repository info at the bottom */
 .footer {
-  padding: 14px 16px;
-  border-top: 1px solid var(--border-subtle);
-  background: #ffffff;
+  padding: 12px 14px;
+  border-top: 1px solid #f1f5f9;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  cursor: pointer;
+  transition: background 0.12s ease;
 }
 
-.gitStatus {
+.footer:hover {
+  background: #f8fafc;
+}
+
+.footerSiteName {
+  font-size: 12px;
+  font-weight: 600;
+  color: #0f172a;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.footerMeta {
   display: flex;
   align-items: center;
-  gap: 8px;
-  font-size: 11.5px;
-  color: var(--text-primary);
-  margin-bottom: 4px;
+  gap: 6px;
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  color: #64748b;
 }
 
-.gitDot {
+.statusDot {
   width: 6px;
   height: 6px;
   border-radius: 50%;
   background: #10b981;
 }
 
-.branchStatus {
-  font-size: 11px;
-  color: var(--text-muted);
-  font-family: var(--font-mono);
+.statusDotPending {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #94a3b8;
 }

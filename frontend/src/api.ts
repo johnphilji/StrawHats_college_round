@@ -11,6 +11,27 @@ import type {
 
 export const MOCK_WEBSITES: ConnectedWebsite[] = [
   {
+    id: 'persia-darbar',
+    name: 'Persia Darbar',
+    tagline: 'Authentic Mughlai & Persian fine dining experience',
+    repoUrl: 'https://github.com/johnphilji/Persia-Darbar-React-website.git',
+    repoOwner: 'johnphilji',
+    repoName: 'Persia-Darbar-React-website',
+    branch: 'main',
+    previewUrl: 'http://localhost:5174',
+    productionUrl: 'https://persia-darbar.vercel.app',
+    status: 'connected',
+    mode: 'managed',
+    runtimeLoaderInstalled: true,
+    lastModified: 'Just now',
+    componentCount: 28,
+    category: 'Ecommerce',
+    code: 'PD',
+    framework: 'React 18 / Vite 5',
+    activeRelease: 'v1.0.0',
+    activePatchesCount: 0,
+  },
+  {
     id: 'acme-store',
     name: 'Acme Supply Store',
     tagline: 'Modern pet supplies & accessories storefront',

@@ -1,7 +1,7 @@
 import { buildPatchBranchName } from '../integrations/git/branch';
 import { getPatchProvider, type PatchProvider } from '../integrations/llm/provider';
 import { componentResolverService, type ComponentResolverService } from './component-resolver.service';
-import { applyParsedDiff, parseUnifiedDiff, validatePatchDiff } from './patch-validation.service';
+import { applyParsedDiff, parseUnifiedDiff, serializeParsedDiff, validatePatchDiff } from './patch-validation.service';
 import { buildStyleContext } from './style-context.service';
 import { githubAppService, type GithubAppService } from './github-app.service';
 import { projectsService } from '../modules/projects/projects.service';
@@ -177,11 +177,11 @@ export class PatchGenerationService {
 
         const validation = validatePatchDiff(generated.diff, entry.filePath, source.source);
         if (!validation.valid) throw validationError('Generated patch failed validation.', { errors: validation.errors });
-        const parsed = parseUnifiedDiff(generated.diff).parsed;
+        const parsed = parseUnifiedDiff(generated.diff, source.source).parsed;
         if (!parsed) throw validationError('Generated patch could not be parsed.');
         applyParsedDiff(source.source, parsed);
 
-        diff = generated.diff;
+        diff = serializeParsedDiff(parsed);
         summary = generated.summary || `Update ${entry.componentName}`;
         additions = validation.addedLines;
         deletions = validation.removedLines;
@@ -202,7 +202,7 @@ export class PatchGenerationService {
       if (source.path !== entry.filePath) throw conflict('GitHub returned source for a different path.');
       const validation = validatePatchDiff(diff, entry.filePath, source.source);
       if (!validation.valid) throw validationError('Saved patch no longer applies to its original base.', { errors: validation.errors });
-      const parsed = parseUnifiedDiff(diff).parsed;
+      const parsed = parseUnifiedDiff(diff, source.source).parsed;
       if (!parsed) throw validationError('Saved patch could not be parsed.');
       const updatedSource = applyParsedDiff(source.source, parsed);
 

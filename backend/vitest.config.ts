@@ -7,5 +7,8 @@ export default defineConfig({
     include: ['tests/**/*.test.ts', 'src/**/*.test.ts'],
     setupFiles: [],
     testTimeout: 10000,
+    env: {
+      LLM_PROVIDER: 'mock',
+    },
   },
 });

@@ -9,10 +9,12 @@ import githubRoutes from '../modules/github/github.routes';
 import workflowRoutes from '../modules/workflow/workflow.routes';
 import deploymentsRoutes from '../modules/deployments/deployments.routes';
 import releasesRoutes from '../modules/releases/releases.routes';
+import runtimeRoutes from './runtime.routes';
 
 const router = Router();
 
 router.use('/health', healthRoutes);
+router.use('/runtime', runtimeRoutes);
 router.use(patchesRoutes);
 router.use('/projects', projectsRoutes);
 router.use('/llm', llmRoutes);

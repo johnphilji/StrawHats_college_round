@@ -11,6 +11,7 @@ import { createDefaultRepositoryProvider } from './repository-provider.service';
 import {
   applyParsedDiff,
   parseUnifiedDiff,
+  serializeParsedDiff,
   validatePatchDiff,
   type PatchValidationResult,
 } from './patch-validation.service';
@@ -150,9 +151,11 @@ export class EditOrchestrationService {
 
     // 5. Isolated application: temp copy only, never the repository.
     let isolatedPreviewApplied = false;
+    let finalDiff = generated.diff;
     if (validation.valid) {
-      const { parsed } = parseUnifiedDiff(generated.diff);
+      const { parsed } = parseUnifiedDiff(generated.diff, sourceCode);
       if (parsed) {
+        finalDiff = serializeParsedDiff(parsed);
         const patched = applyParsedDiff(sourceCode, parsed);
         const previewDir = fs.mkdtempSync(path.join(os.tmpdir(), 'patchwork-preview-'));
         const previewFile = path.join(previewDir, path.basename(entry.filePath));
@@ -177,7 +180,7 @@ export class EditOrchestrationService {
       instruction,
       provider: generated.provider,
       simulated: generated.simulated,
-      diff: generated.diff,
+      diff: finalDiff,
       changedFiles: validation.valid ? validation.changedFiles : [],
       summary: generated.summary,
       validation,

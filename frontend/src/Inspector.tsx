@@ -19,6 +19,7 @@ interface InspectorProps {
   projectId?: string;
   repositoryIdentifier?: string;
   productionBranch?: string;
+  onRequireAuth?: () => void;
 }
 
 export default function Inspector({
@@ -30,6 +31,7 @@ export default function Inspector({
   projectId,
   repositoryIdentifier,
   productionBranch,
+  onRequireAuth,
 }: InspectorProps) {
   const [instruction, setInstruction] = useState('');
   const [isGenerating, setIsGenerating] = useState(false);
@@ -257,7 +259,34 @@ export default function Inspector({
       )}
 
       <div className={styles.body}>
-        {requestError && <div className={styles.errorAlert} role="alert">{requestError}</div>}
+        {requestError && (
+          <div className={styles.errorAlert} role="alert">
+            <div style={{ marginBottom: requestError.toLowerCase().includes('authentication') && onRequireAuth ? '8px' : 0 }}>
+              {requestError}
+            </div>
+            {requestError.toLowerCase().includes('authentication') && onRequireAuth && (
+              <button
+                type="button"
+                onClick={onRequireAuth}
+                style={{
+                  background: '#09090b',
+                  color: '#ffffff',
+                  border: 'none',
+                  borderRadius: '4px',
+                  padding: '5px 10px',
+                  fontSize: '11px',
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '4px',
+                }}
+              >
+                Sign in to continue →
+              </button>
+            )}
+          </div>
+        )}
         {/* STEP 1: Describe the change (Prompt Input) */}
         {!activeChange && !isGenerating && (
           <div className={styles.promptSection}>
@@ -378,8 +407,12 @@ export default function Inspector({
             </div>
 
             <div className={styles.actionButtons}>
-              <button className={styles.approveBtn} onClick={handleApproveBranch} disabled={!activeChange.patchId}>
-                {activeChange.patchId ? 'Approve Patch' : 'Connect a GitHub project to commit'}
+              <button
+                className={styles.approveBtn}
+                onClick={handleApproveBranch}
+                disabled={activeChange.validationErrors.length > 0}
+              >
+                {activeChange.patchId ? 'Approve Patch' : 'Approve & Stage Patch'}
               </button>
               <button className={styles.discardBtn} onClick={() => onChangeUpdate(null)}>
                 Discard
@@ -418,9 +451,15 @@ export default function Inspector({
             </p>
 
             <div className={styles.releaseActions}>
-              <button className={styles.deployBtn} onClick={handleCreatePullRequest} disabled={isDeploying || !activeChange.patchId}>
-                {isDeploying ? 'Creating pull request…' : 'Create Pull Request'}
-              </button>
+              {activeChange.patchId ? (
+                <button className={styles.deployBtn} onClick={handleCreatePullRequest} disabled={isDeploying}>
+                  {isDeploying ? 'Creating pull request…' : 'Create Pull Request'}
+                </button>
+              ) : (
+                <button className={styles.deployBtn} onClick={onRequireAuth}>
+                  Connect GitHub to Open Pull Request
+                </button>
+              )}
               <button className={styles.discardBtn} onClick={() => onChangeUpdate(null)}>
                 Cancel
               </button>
