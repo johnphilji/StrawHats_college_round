@@ -22,5 +22,7 @@
     "erasableSyntaxOnly": true,
     "noFallthroughCasesInSwitch": true
   },
-  "include": ["src"]
+  "include": ["src"],
+  // node --test files are type-stripped at runtime, not bundled
+  "exclude": ["src/**/*.test.ts"]
 }

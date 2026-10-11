@@ -63,10 +63,12 @@ enum AuditAction {
   PATCH_CREATED
   PATCH_GENERATION_STARTED
   PATCH_GENERATED
+  PATCH_GENERATION_FAILED
   PATCH_VALIDATION_STARTED
   PATCH_VALIDATED
   PATCH_VALIDATION_FAILED
   PATCH_APPROVED
+  PATCH_PULL_REQUEST_CREATED
   PATCH_REJECTED
   PATCH_MERGED
   PATCH_CANCELLED
@@ -98,6 +100,9 @@ model Project {
   repositoryUrl        String?  @map("repository_url")
   repositoryIdentifier String?  @map("repository_identifier")
   productionBranch     String   @default("main") @map("production_branch")
+
+  // Public URL of the deployed/hosted website used for previewing the site.
+  productionUrl        String?  @map("production_url")
 
   // Supabase Auth user UUID; not a foreign key to auth.users.
   ownerId              String   @map("owner_id")

@@ -1,9 +1,9 @@
 {
   "extends": "./tsconfig.json",
   "compilerOptions": {
-    "rootDir": "src",
+    "rootDir": ".",
     "outDir": "dist"
   },
-  "include": ["src/**/*"],
-  "exclude": ["node_modules", "dist", "generated", "tests", "prisma.config.ts", "vitest.config.ts"]
+  "include": ["src/**/*", "generated/prisma/**/*.ts"],
+  "exclude": ["node_modules", "dist", "tests", "prisma.config.ts", "vitest.config.ts"]
 }

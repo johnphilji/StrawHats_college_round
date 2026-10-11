@@ -1,3 +1,4 @@
+<!-- Person 3 - Armaan (LLM and Git integration: implementation plan for the LLM + Git workflow) -->
 # PATCHWORK — Implementation Plan for Person 3: LLM & Git Workflow
 
 ## 1. Role in the team
@@ -691,3 +692,246 @@ Their work is not just LLM access; it is the implementation of the safe computat
 If Person 3 succeeds, the platform can execute the most important feature in the project: turning a simple user instruction into a real, isolated, reviewable code change.
 
 This is the central and most important technical responsibility in the team structure.
+
+---
+
+## 15. Current Implementation Baseline (2026-10-11)
+
+This section records the verified state of `final-git-integration` and is the
+source of truth for what remains. Earlier sections describe the target design;
+they must not be read as proof that those operations are already connected.
+
+| Area | Present on this branch | Still missing or disconnected |
+|---|---|---|
+| Component selection | `frontend/src/patchwork-bridge.ts`, `frontend/src/selection-protocol.ts`, and `backend/src/config/component-registry.ts` implement the iframe message contract and trusted component-to-file mappings. | The configured Persia Darbar target checkout does not currently render the registry's `data-patchwork-id` anchors or load the selection runtime. Source resolution works, but live selection-to-edit does not work end to end. |
+| Local edit API | `POST /api/edits/generate` resolves a registered component, reads its source, calls the configured provider, validates a diff, and writes only an isolated temporary preview. | `getPatchProvider()` selects the mock by default. The mock inserts a simulated comment and does not implement the requested change. The target repository remains unchanged by design. |
+| Groq | `backend/src/integrations/llm/groq.ts` builds a prompt, calls Groq, parses a result, and returns a proposed diff through `POST /api/llm/generate-patch`. | This is separate from the editor. It does not use the trusted source resolver, run `validatePatchDiff`, create a branch, persist a patch, or commit. Its route currently has no user authentication or rate limit. |
+| Diff safety | `backend/src/services/patch-validation.service.ts` checks unified diff syntax, target path, allowed extension, hunk/source consistency, and size limits. `edit-orchestration.service.ts` applies accepted hunks to an isolated copy and checks that the source did not change. | These protections are used by local edit orchestration, not the standalone Groq endpoint. No build/typecheck is run against generated output. |
+| Patch metadata | Project/patch routes persist drafts, enforce status transitions, scope access to owners, and record audit events. | Status transitions do not dispatch generation, validation, Git operations, or callbacks. Generated diff/branch/commit metadata is not written by the current generation path. |
+| Git | `backend/src/integrations/git/branch.ts` creates a safe branch-name string. | There is no Git branch creation, patch application, commit, or conflict-check operation in this branch. |
+| GitHub and worker APIs | GitHub write, worker-callback, and deployment/release workflow modules are not present in this branch's tracked source. | `origin/backend` has separate work (including commit `4e5a54d`) with GitHub and callback/tracking APIs; it is not included in `final-git-integration`. Review and integrate it deliberately with Person 2; do not assume those APIs exist here or copy files without reconciling contracts. Its own documentation says no generation queue/worker or Vercel trigger/poller is wired. |
+| Frontend | `frontend/src/PreviewPane.tsx` loads component metadata; `frontend/src/Inspector.tsx` calls `/api/edits/generate` and displays its proposal. | The editor does not call Groq, create/list persisted projects or patches, dispatch jobs, or use real Git branch/commit/PR metadata. “Apply to Branch” and “Approve Release” update local UI state only. Other workflow screens still use demo data. |
+| Local configuration | `TARGET_REPOSITORY_PATH` was set to the local Persia Darbar checkout and is ignored by Git. | On the latest safe check, `backend/.env` had no `GROQ_API_KEY` and no `GROQ_MODEL`; provider selection therefore stays mock and Groq is not ready for a fresh process. Keep credentials only in ignored local/hosted secret storage. |
+| Tests | Backend tests cover the mock pipeline, registry, diff validator, patch status behavior, and Groq parsing/API behavior with mocked fetch responses. Baseline: 13 test files / 88 tests passed. | They do not prove live Groq-to-GitHub behavior, worker dispatch, real App permissions, or production deployment. |
+
+### Existing request paths (do not conflate them)
+
+1. **Editor path:** iframe selection → `PreviewPane` metadata lookup →
+  `Inspector` → `POST /api/edits/generate` → trusted registry/local source →
+  mock provider → diff validation → isolated temp copy.
+2. **Standalone Groq path:** `POST /api/llm/generate-patch` → Groq → parsed
+  diff/branch-name response. It stops before validation or repository changes.
+3. **Persisted patch path:** create a project patch → owner-controlled status
+  transitions and audit records. This currently does not invoke either path
+  above.
+
+Person 3's integration work is to connect these paths without weakening their
+existing safety boundaries. Preserve existing editor and API contracts during
+migration; do not remove a route or change its response shape until its callers
+and tests have moved.
+
+## 16. Integration Principles and Non-Negotiable Invariants
+
+- **One authoritative pipeline:** the dashboard and any worker must call the
+  same orchestration/provider layer. Do not keep separate Groq implementations
+  for the standalone route and editor.
+- **Trusted source mapping:** accept a component ID and instruction from the
+  client. Resolve paths, editable scope, and allowed operations on the server.
+  Never let browser input choose an arbitrary repository path.
+- **Validate before writing:** parse and validate the LLM diff against the
+  exact current source and one authorized file before creating commits. Reject
+  empty, malformed, oversized, stale, traversal, or multi-file output.
+- **No production mutation during proposal/review:** generation and preview
+  may create an isolated patch branch, but must never write to the target
+  repository working tree, default branch, or production before approval.
+- **Expected-head protection:** branch creation and commits use the verified
+  base/head SHA. Never force-update a branch. If source changes after
+  generation, fail as a conflict and require regeneration/review.
+- **Persist actual outcomes:** never advance a patch to `GENERATED`,
+  `VALIDATED`, `APPROVED`, or `MERGED` just because a request was accepted.
+  Store actual diff, changed paths, branch, base/head SHAs, validation result,
+  and operation errors through the agreed backend contract.
+- **Secrets stay server-side:** Groq, GitHub App, and worker secrets must not
+  be sent to the browser, committed, or logged. Protect any endpoint that can
+  spend the server's Groq quota against unauthorized use and abuse.
+- **Explicit provider state:** mark mock output as simulated. Select Groq only
+  when its key and an account-accessible model are configured; configuration
+  errors must not silently fall back to mock or claim real generation.
+- **Small integrations:** reuse Person 2's backend APIs when contracts match.
+  Reconcile duplicate types/routes/services instead of adding parallel schemas.
+
+## 17. Remaining Implementation Plan
+
+Complete these phases in order. Each phase has a required gate; do not continue
+if its gate fails.
+
+### Phase A — Freeze contracts and integrate backend dependencies
+
+1. Confirm `final-git-integration` is the working branch and record the current
+  test/build baseline. Keep the existing secret and worktree hygiene.
+2. Review Person 2's work on `origin/backend`, especially commit `4e5a54d`, with
+  Person 2. Decide together whether to merge/cherry-pick it or port only
+  required commits. It is not currently included in this branch.
+3. Reconcile route paths, auth identity, patch states, audit metadata, callback
+  signatures, and response DTOs. Avoid duplicate project/patch, GitHub, or
+  release modules.
+4. Define the shared request/response contract for Inspector, API,
+  orchestration, and persisted patch record. Keep current edit-proposal fields
+  until the frontend is migrated; add patch IDs and real status/branch/commit
+  metadata compatibly.
+
+**Gate A:** backend typecheck/build and existing tests pass; health, project,
+patch, component, and edit routes retain their contracts; no conflict markers
+or credentials are tracked.
+
+### Phase B — Make target selection and source mapping real
+
+1. Add the exact registry IDs as `data-patchwork-id` attributes to the matching
+  Persia Darbar components. Load the selection runtime with an explicit
+  dashboard-origin allow-list. Keep selection disabled by default and preserve
+  normal click/navigation behavior while disabled.
+2. Verify every registry ID maps to an existing source file and the selected
+  element reports that same ID. Never expose file paths to the browser.
+3. Verify `TARGET_REPOSITORY_PATH` points to the local checkout for development;
+  configure it through host secrets/config in hosted environments.
+
+**Gate B:** iframe handshake reaches `READY`; supported elements can be
+selected and resolved by the backend; unknown IDs and stale mappings fail
+cleanly. Test missing target, wrong origin, and unregistered ID cases.
+
+### Phase C — Unify Groq and editor generation
+
+1. Implement `GroqPatchProvider` behind the existing `PatchProvider` interface
+  and select it through `LLM_PROVIDER=groq`. Give it server-resolved source,
+  registry entry, allowed operations, component description, and instruction.
+2. Reuse one branch-name helper. Remove duplicate naming logic only after tests
+  cover the preserved naming format.
+3. Make `/api/edits/generate` and the editor use this orchestration path. Keep
+  `/api/llm/generate-patch` only if needed for compatibility; make it delegate
+  to the same validated service instead of a parallel generator.
+4. Add request timeout, bounded response size, and safe handling for rate
+  limits, network failures, invalid JSON, missing content, and model errors.
+  Never log credentials, authorization headers, or full private source.
+5. Parse model output into a typed schema and validate the diff against the
+  authorized file and current source before returning it. The prompt is not a
+  security boundary; the validator is mandatory.
+6. Add authentication/authorization and request throttling to routes that can
+  spend the server's Groq quota.
+
+**Gate C:** mocked tests cover valid/malformed output, timeout, rate limits,
+missing key, unsupported model, and malicious/unrelated file output. The editor
+receives a Groq proposal with `simulated: false`; invalid output never reaches
+Git operations.
+
+### Phase D — Connect persisted patch state and generation worker
+
+1. On edit request, create or reuse an owned project patch record and store the
+  prompt/component metadata. Do not use a frontend-only `editId` as the sole
+  record of work.
+2. Start generation through one controlled dispatch path. Prefer Person 2's
+  trusted callback contract if integrated. Add one dispatch mechanism and one
+  worker, not a second lifecycle implementation. If the team chooses a
+  synchronous MVP instead, document that limitation and still use the same
+  state transitions and result persistence.
+3. Bind callbacks to a server-issued generation ID; authenticate worker
+  callbacks with the agreed HMAC contract, timestamp bounds, raw-body
+  verification, and idempotent/stale-result rejection. Keep the worker secret
+  server-side.
+4. Persist success/failure, diff metadata, branch/base/head identifiers, and
+  audit events transactionally. Worker failure must be visible; never
+  fabricate success.
+
+**Gate D:** tests prove one dispatch per generation ID, idempotent retry, stale
+callback rejection, invalid worker-signature rejection, audit persistence for
+success/failure, and no secret/source leakage in public responses.
+
+### Phase E — Validate, apply, and create the isolated Git change
+
+1. Fetch exact source at the selected repository/base SHA through the configured
+  provider. Keep the local provider for the controlled local demo; use the
+  GitHub App provider for GitHub repositories. Never mix a local path with a
+  different remote repository identifier.
+2. Run `validatePatchDiff` against that source and authorized registry file.
+  Apply the parsed patch in memory first. Run applicable build/type/lint checks
+  in an isolated checkout or worker workspace.
+3. Use the reviewed GitHub App service, when integrated, to create a unique
+  patch branch from the verified base and commit only validated files. Pass
+  expected head SHA/idempotency key; use non-force updates. Never write to the
+  default branch. Return actual branch name and commit SHA.
+4. Create a pull request only after commit succeeds, if required by the agreed
+  workflow. Commit success is not approval, merge, or deployment.
+5. Detect an existing branch/source change as a conflict. Persist the conflict
+  and stop; do not auto-overwrite or silently retry against a new base.
+
+**Gate E:** tests cover successful single-file branch/commit, wrong paths,
+traversal, oversized diff, stale base/head, GitHub permission denial, network
+failure, idempotent retry, and PR failure after commit. The default branch and
+local target checkout remain unchanged.
+
+### Phase F — Integrate frontend review and real workflow status
+
+1. Replace the inspector's mock-only submit path with persisted patch APIs and
+  generation results. Preserve loading, retryable errors, visible validation,
+  and an explicit simulated badge in mock mode.
+2. Populate branch name, commit SHA, changed files, and status from backend
+  responses; remove hard-coded `local/preview`, `uncommitted`, and fake
+  success values from the real-provider path.
+3. Make “Apply to Branch” and approval actions call real backend operations.
+  Approval must not imply merge or deploy unless the server confirms it.
+  Keep labels/statuses aligned with actual server state.
+4. Keep conflict/release/deployment screens marked as demo data until their
+  APIs are integrated. Coordinate preview/deployment work with Person 4;
+  Person 3 must not implement a parallel deployment provider.
+
+**Gate F:** frontend build/lint and a browser flow cover selection → request →
+proposal → review → reject/approve. Reload can recover persisted status;
+failed requests preserve the prompt and selection.
+
+### Phase G — End-to-end rehearsal and release readiness
+
+Run success and failure scenarios on `final-git-integration` with a controlled
+test repository and test GitHub App installation:
+
+1. Select a registry-backed component and submit a small natural-language edit.
+2. Confirm trusted source context and the configured Groq provider were used.
+3. Confirm the diff is single-file, validated, and build-tested before write.
+4. Confirm a non-default branch and commit SHA exist; verify the default branch
+  has not changed.
+5. Review the real diff/PR and test result in the frontend.
+6. Exercise malformed output, missing credentials, revoked GitHub permissions,
+  stale source, and network failure. Each must stop safely and record a useful
+  failure.
+7. Verify patch history/audit matches actual operations. Hand the validated
+  branch/commit to Person 4 for isolated preview/deployment checks.
+
+**Final gate:** backend typecheck/build/tests and frontend build/lint pass; no
+unresolved conflicts or tracked credentials; live GitHub operations succeed
+only on a disposable/test branch; production merge/deployment requires explicit
+approval and Person 4's verification.
+
+## 18. Regression and Safety Checklist
+
+Run relevant checks after each phase, not only at the end:
+
+- Backend: `npm --prefix backend run typecheck`, `npm --prefix backend test`,
+  and `npm --prefix backend run build`.
+- Frontend: `npm --prefix frontend run build` and
+  `npm --prefix frontend run lint`.
+- API regression: health, project auth/ownership, patch CRUD/status transitions,
+  component metadata/source resolution, and existing edit-proposal response.
+- Security regression: no client-controlled paths; no absolute/traversal paths;
+  allowed file scope; GitHub writes use the authenticated user's installation;
+  worker callbacks require valid signatures; secrets never appear in responses,
+  logs, tests, commits, or screenshots.
+- State regression: each transition is valid and audited; callbacks are
+  idempotent; stale/concurrent updates become conflicts; approval is distinct
+  from merge; merge is distinct from deployment.
+- Repository regression: preview is isolated; commits target only the patch
+  branch; no force update; original checkout/default branch remains unchanged
+  until an explicitly authorized merge.
+- Demo regression: label mock output accurately; never present mocked conflict,
+  test, release, or deployment data as live.
+
+If a gate fails, stop at that phase, preserve the source/default branch, fix the
+narrow failing slice, and rerun the same checks before continuing. Do not hide a
+failure by changing status or silently switching providers.
