@@ -10,6 +10,7 @@ import {
 import { createDefaultRepositoryProvider } from './repository-provider.service';
 import {
   applyParsedDiff,
+  normalizeUnifiedDiff,
   parseUnifiedDiff,
   validatePatchDiff,
   type PatchValidationResult,
@@ -134,9 +135,14 @@ export class EditOrchestrationService {
       },
     });
 
-    // 4. Syntax + scope validation against the authorized file.
-    const validation = generated.diff
-      ? validatePatchDiff(generated.diff, entry.filePath, sourceCode)
+    // 4. Syntax + scope validation against the authorized file. Models often
+    // emit under-specified hunk headers (a bare "@@"); repair those against the
+    // source first. The repair is only trusted once the re-validated diff passes.
+    const normalizedDiff = generated.diff
+      ? normalizeUnifiedDiff(generated.diff, sourceCode)
+      : generated.diff;
+    const validation = normalizedDiff
+      ? validatePatchDiff(normalizedDiff, entry.filePath, sourceCode)
       : {
           valid: false,
           changedFiles: [],
@@ -151,7 +157,7 @@ export class EditOrchestrationService {
     // 5. Isolated application: temp copy only, never the repository.
     let isolatedPreviewApplied = false;
     if (validation.valid) {
-      const { parsed } = parseUnifiedDiff(generated.diff);
+      const { parsed } = parseUnifiedDiff(normalizedDiff);
       if (parsed) {
         const patched = applyParsedDiff(sourceCode, parsed);
         const previewDir = fs.mkdtempSync(path.join(os.tmpdir(), 'patchwork-preview-'));
@@ -177,7 +183,7 @@ export class EditOrchestrationService {
       instruction,
       provider: generated.provider,
       simulated: generated.simulated,
-      diff: generated.diff,
+      diff: normalizedDiff,
       changedFiles: validation.valid ? validation.changedFiles : [],
       summary: generated.summary,
       validation,

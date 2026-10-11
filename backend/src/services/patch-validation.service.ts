@@ -119,6 +119,68 @@ export function parseUnifiedDiff(diff: string): { parsed?: ParsedDiff; errors: s
 }
 
 /**
+ * Repairs under-specified hunk headers that some LLMs emit (notably a bare
+ * `@@` with no line ranges) by computing real line numbers from the current
+ * `sourceCode`. This keeps strict validation intact: the normalized diff is
+ * still fully re-validated against the authorized file before anything is
+ * applied, and no change is trusted just because it parsed.
+ */
+export function normalizeUnifiedDiff(diff: string, sourceCode: string): string {
+  if (!diff || !diff.trim()) return diff;
+  const sourceLines = sourceCode.split('\n');
+  const lines = diff.split('\n');
+  const out: string[] = [];
+
+  let i = 0;
+  while (i < lines.length) {
+    const line = lines[i];
+    const headerLike = line.startsWith('@@') && !HUNK_HEADER.test(line);
+    if (!headerLike) {
+      out.push(line);
+      i += 1;
+      continue;
+    }
+
+    const body: string[] = [];
+    let j = i + 1;
+    while (
+      j < lines.length &&
+      !lines[j].startsWith('@@') &&
+      !lines[j].startsWith('--- ') &&
+      !lines[j].startsWith('+++ ')
+    ) {
+      body.push(lines[j]);
+      j += 1;
+    }
+    while (body.length > 0 && body[body.length - 1] === '') body.pop();
+
+    const oldCount = body.filter((l) => l.startsWith(' ') || l.startsWith('-')).length;
+    const newCount = body.filter((l) => l.startsWith(' ') || l.startsWith('+')).length;
+    if (oldCount === 0 && newCount === 0) {
+      i = j;
+      continue;
+    }
+
+    const anchorIndex = body.findIndex((l) => l.startsWith(' ') || l.startsWith('-'));
+    let oldStart = 1;
+    if (anchorIndex >= 0) {
+      const anchorText = body[anchorIndex].slice(1);
+      const precedingOldLines = body
+        .slice(0, anchorIndex)
+        .filter((l) => l.startsWith(' ') || l.startsWith('-')).length;
+      const found = sourceLines.findIndex((sourceLine) => sourceLine === anchorText);
+      if (found >= 0) oldStart = Math.max(1, found + 1 - precedingOldLines);
+    }
+
+    out.push(`@@ -${oldStart},${oldCount} +${oldStart},${newCount} @@`);
+    out.push(...body);
+    i = j;
+  }
+
+  return out.join('\n');
+}
+
+/**
  * Validate `diff` against the single authorized registry file and the
  * current `sourceCode` of that file.
  */

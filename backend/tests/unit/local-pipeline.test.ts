@@ -18,6 +18,7 @@ import {
 import {
   validatePatchDiff,
   applyParsedDiff,
+  normalizeUnifiedDiff,
   parseUnifiedDiff,
 } from '../../src/services/patch-validation.service';
 import { EditOrchestrationService } from '../../src/services/edit-orchestration.service';
@@ -400,6 +401,51 @@ describe('patch lifecycle forward chain', () => {
     await expect(patchesService.updateStatus('project-1', 'patch-1', 'user-1', 'CANCELLED' as never)).rejects.toMatchObject({
       statusCode: 409,
     });
+  });
+});
+
+describe('normalizeUnifiedDiff', () => {
+  const source = [
+    'export default function Hero() {',
+    '  return (',
+    '    <p className="hero__tagline" data-patchwork-id="hero-tagline">',
+    '      Authentic Chinese &amp; Mughlai Flavours, Crafted with Tradition',
+    '    </p>',
+    '  );',
+    '}',
+  ].join('\n');
+
+  it('rewrites a bare @@ header into a valid, source-anchored hunk', () => {
+    const diff = [
+      '--- a/src/components/Hero.jsx',
+      '+++ b/src/components/Hero.jsx',
+      '@@',
+      '-      Authentic Chinese &amp; Mughlai Flavours, Crafted with Tradition',
+      '+      Authentic Chinese &amp; Mughlai Flavours, Served with Royal Hospitality',
+      '',
+    ].join('\n');
+
+    const normalized = normalizeUnifiedDiff(diff, source);
+    expect(normalized).toContain('@@ -4,1 +4,1 @@');
+
+    const validation = validatePatchDiff(normalized, 'src/components/Hero.jsx', source);
+    expect(validation.valid).toBe(true);
+
+    const { parsed } = parseUnifiedDiff(normalized);
+    expect(parsed).toBeTruthy();
+    expect(applyParsedDiff(source, parsed!)).toContain('Served with Royal Hospitality');
+  });
+
+  it('leaves already-valid hunk headers untouched', () => {
+    const diff = [
+      '--- a/src/components/Hero.jsx',
+      '+++ b/src/components/Hero.jsx',
+      '@@ -4,1 +4,1 @@',
+      '-      old line',
+      '+      new line',
+      '',
+    ].join('\n');
+    expect(normalizeUnifiedDiff(diff, 'old line')).toContain('@@ -4,1 +4,1 @@');
   });
 });
 

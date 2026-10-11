@@ -1,7 +1,7 @@
 import { buildPatchBranchName } from '../integrations/git/branch';
 import { getPatchProvider, type PatchProvider } from '../integrations/llm/provider';
 import { componentResolverService, type ComponentResolverService } from './component-resolver.service';
-import { applyParsedDiff, parseUnifiedDiff, validatePatchDiff } from './patch-validation.service';
+import { applyParsedDiff, normalizeUnifiedDiff, parseUnifiedDiff, validatePatchDiff } from './patch-validation.service';
 import { buildStyleContext } from './style-context.service';
 import { githubAppService, type GithubAppService } from './github-app.service';
 import { projectsService } from '../modules/projects/projects.service';
@@ -175,13 +175,14 @@ export class PatchGenerationService {
         if (generated.errors?.length) throw validationError('Groq could not generate a usable patch.', { errors: generated.errors });
         if (!generated.diff) throw validationError('Groq returned an empty patch.');
 
-        const validation = validatePatchDiff(generated.diff, entry.filePath, source.source);
+        const normalizedDiff = normalizeUnifiedDiff(generated.diff, source.source);
+        const validation = validatePatchDiff(normalizedDiff, entry.filePath, source.source);
         if (!validation.valid) throw validationError('Generated patch failed validation.', { errors: validation.errors });
-        const parsed = parseUnifiedDiff(generated.diff).parsed;
+        const parsed = parseUnifiedDiff(normalizedDiff).parsed;
         if (!parsed) throw validationError('Generated patch could not be parsed.');
         applyParsedDiff(source.source, parsed);
 
-        diff = generated.diff;
+        diff = normalizedDiff;
         summary = generated.summary || `Update ${entry.componentName}`;
         additions = validation.addedLines;
         deletions = validation.removedLines;

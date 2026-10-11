@@ -57,8 +57,11 @@ export function buildGroqPrompt(input: GroqPatchRequest): string {
     '  - You may only modify the mapped component file. Prefer existing classes; when a visual change needs a value, express it with a CSS variable reference or a minimal inline style so the change stays within this single file.',
     '  - Never introduce unrelated colors, fonts, images, external assets, or new dependencies.',
     '- Return only JSON with fields: diff, changedFiles, summary.',
+    '- The diff MUST be a valid unified diff. Every hunk must begin with a header of the form "@@ -<oldStart>,<oldCount> +<newStart>,<newCount> @@" (include real numbers), followed by context lines prefixed with a single space, removals prefixed with "-", and additions prefixed with "+".',
+    '- Include at least one unchanged context line above and below the changed lines so the hunk can be located in the source. Never emit a bare "@@" header.',
+    '- Use the exact mapped file path in BOTH the "--- a/<path>" and "+++ b/<path>" headers.',
     'JSON format example:',
-    '{"diff":"--- a/src/components/CheckoutButton.tsx\\n+++ b/src/components/CheckoutButton.tsx\\n@@\\n- Checkout\\n+ Continue to Payment","changedFiles":["src/components/CheckoutButton.tsx"],"summary":"Updated checkout CTA copy."}',
+    '{"diff":"--- a/src/components/CheckoutButton.tsx\\n+++ b/src/components/CheckoutButton.tsx\\n@@ -1,3 +1,3 @@\\n export function CheckoutButton() {\\n-  return <button>Checkout</button>;\\n+  return <button>Continue to Payment</button>;\\n }","changedFiles":["src/components/CheckoutButton.tsx"],"summary":"Updated checkout CTA copy."}',
     'Only return JSON, no markdown fences, no prose outside the JSON object.',
   ];
 
@@ -129,6 +132,17 @@ export async function generatePatchFromGroq(input: GroqPatchRequest): Promise<Gr
 
   const prompt = buildGroqPrompt(input);
 
+  const model = process.env.GROQ_MODEL || 'openai/gpt-oss-20b';
+  const requestBody: Record<string, unknown> = {
+    model,
+    messages: [{ role: 'user', content: prompt }],
+    temperature: 0.2,
+    max_tokens: 1024,
+  };
+  // Reasoning models (e.g. openai/gpt-oss-20b) otherwise spend the entire
+  // max_tokens budget on hidden reasoning and return an empty message content.
+  if (/gpt-oss/i.test(model)) requestBody.reasoning_effort = 'low';
+
   try {
     const request: RequestInit = {
       method: 'POST',
@@ -137,12 +151,7 @@ export async function generatePatchFromGroq(input: GroqPatchRequest): Promise<Gr
         Authorization: `Bearer ${apiKey}`,
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({
-        model: process.env.GROQ_MODEL || 'openai/gpt-oss-20b',
-        messages: [{ role: 'user', content: prompt }],
-        temperature: 0.2,
-        max_tokens: 800,
-      }),
+      body: JSON.stringify(requestBody),
     };
     let response: Response | undefined;
     for (let attempt = 0; attempt < 2; attempt += 1) {
