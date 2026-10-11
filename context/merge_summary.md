@@ -140,9 +140,10 @@ Owns turning a natural-language request into a safe, isolated, reviewable change
 
 ## 4. Notes / follow-ups
 
-- `context/person3_summary.md` and `context/test_person3.md` were left
-  **untracked**. `test_person3.md` contains a live Groq API key and must **not**
-  be committed — rotate it and keep it out of version control.
+- `context/test_person3.md` contains a live Groq API key and is now **git-ignored**
+  (`.gitignore`). It is intentionally excluded from version control — rotate the
+  key and keep it out of the repo. `context/person3_summary.md` is tracked and
+  included with this summary.
 - The base surgery is verified (typecheck/build/tests/lint), but a live
   end-to-end run against a real Groq key and a test GitHub App installation is
   still required before release.

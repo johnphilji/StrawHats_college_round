@@ -1,5 +1,16 @@
 node_modules
 
-# Local environment secrets
-/backend/.env
-/frontend/.env
+# Local environment secrets / credentials (never commit real values)
+.env
+.env.*
+!.env.example
+
+# Private keys and certificates
+*.pem
+*.key
+*.p12
+*.pfx
+*.keystore
+
+# Local scratch notes that may contain live credentials
+context/test_person3.md
