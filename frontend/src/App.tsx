@@ -19,8 +19,11 @@ import { supabase } from './lib/supabase';
 export default function App() {
   // Start on public homepage on refresh/initial visit; user can launch Studio or sign in
   const [inStudio, setInStudio]             = useState<boolean>(false);
-  const [activeView, setActiveView]         = useState<string>('dashboard');
-  const [currentWebsite, setCurrentWebsite] = useState<ConnectedWebsite | null>(null);
+  const [activeView, setActiveView]         = useState<string>(() => {
+    const githubConnected = new URLSearchParams(window.location.search).get('github_connected') === '1';
+    return githubConnected ? 'websites' : 'dashboard';
+  });
+  const [currentWebsite, setCurrentWebsite] = useState<ConnectedWebsite | null>(MOCK_WEBSITES[0] ?? null);
   const [websites]                          = useState<ConnectedWebsite[]>(MOCK_WEBSITES);
   const [selected, setSelected]             = useState<SelectedComponent | null>(null);
   const [activeChange, setActiveChange]     = useState<CodeChange | null>(null);
@@ -143,7 +146,7 @@ export default function App() {
           </button>
 
           <div className="breadcrumb">
-            <span className="breadcrumb-brand" onClick={() => setActiveView('dashboard')}>PATCHWORK</span>
+            <span className="breadcrumb-brand" onClick={() => setActiveView(currentWebsite ? 'websites' : 'dashboard')}>PATCHWORK</span>
             {activeView === 'dashboard' ? (
               <>
                 <span className="breadcrumb-sep">/</span>

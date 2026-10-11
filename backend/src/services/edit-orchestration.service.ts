@@ -10,6 +10,7 @@ import {
 import { createDefaultRepositoryProvider } from './repository-provider.service';
 import {
   applyParsedDiff,
+  normalizeUnifiedDiff,
   parseUnifiedDiff,
   serializeParsedDiff,
   validatePatchDiff,
@@ -135,9 +136,14 @@ export class EditOrchestrationService {
       },
     });
 
-    // 4. Syntax + scope validation against the authorized file.
-    const validation = generated.diff
-      ? validatePatchDiff(generated.diff, entry.filePath, sourceCode)
+    // 4. Syntax + scope validation against the authorized file. Models often
+    // emit under-specified hunk headers (a bare "@@"); repair those against the
+    // source first. The repair is only trusted once the re-validated diff passes.
+    const normalizedDiff = generated.diff
+      ? normalizeUnifiedDiff(generated.diff, sourceCode)
+      : generated.diff;
+    const validation = normalizedDiff
+      ? validatePatchDiff(normalizedDiff, entry.filePath, sourceCode)
       : {
           valid: false,
           changedFiles: [],
@@ -153,7 +159,7 @@ export class EditOrchestrationService {
     let isolatedPreviewApplied = false;
     let finalDiff = generated.diff;
     if (validation.valid) {
-      const { parsed } = parseUnifiedDiff(generated.diff, sourceCode);
+      const { parsed } = parseUnifiedDiff(normalizedDiff, sourceCode);
       if (parsed) {
         finalDiff = serializeParsedDiff(parsed);
         const patched = applyParsedDiff(sourceCode, parsed);

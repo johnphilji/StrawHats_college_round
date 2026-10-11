@@ -12,6 +12,7 @@ export const projectsRepository = {
           repositoryUrl: data.repositoryUrl ?? null,
           repositoryIdentifier: data.repositoryIdentifier ?? null,
           productionBranch: data.productionBranch ?? 'main',
+          productionUrl: data.productionUrl ?? null,
           ownerId: data.ownerId,
         },
       });
