@@ -90,7 +90,6 @@ export default function WebsitesView({ onSelectWebsite, isAuthenticated, onSignI
 
   // GitHub mode fields
   const [selectedRepositoryId, setSelectedRepositoryId] = useState('');
-  const [branch, setBranch] = useState('');
   const [hostedUrl, setHostedUrl] = useState('');
   const [repositories, setRepositories] = useState<GitHubRepository[]>([]);
   const [installation, setInstallation] = useState<GitHubInstallation | null>(null);
@@ -358,6 +357,12 @@ export default function WebsitesView({ onSelectWebsite, isAuthenticated, onSignI
               </button>
             </div>
 
+            {notice && (
+              <div style={{ padding: '8px 24px', background: '#eff6ff', color: '#1d4ed8', fontSize: '12.5px', borderBottom: '1px solid #dbeafe' }}>
+                {notice}
+              </div>
+            )}
+
             {/* Mode selection tabs */}
             <div style={{ padding: '16px 24px 0 24px' }}>
               <div className={styles.modeTabs}>
@@ -391,79 +396,172 @@ export default function WebsitesView({ onSelectWebsite, isAuthenticated, onSignI
                     className={styles.input}
                     required
                   />
-              </div>
-            </div>
+                </div>
 
-              {isAuthenticated && installation?.connected ? (
-                <>
-                  {repositories.length > 0 ? (
-                    <>
-                      <div className={styles.field}>
-                        <label className={styles.label} htmlFor="github-repository">GitHub repository</label>
-                        <select
-                          id="github-repository"
-                          className={styles.input}
-                          value={selectedRepositoryId}
-                          onChange={(event) => {
-                            const id = event.target.value;
-                            setSelectedRepositoryId(id);
-                            setBranch(repositories.find((repo) => String(repo.id) === id)?.defaultBranch ?? '');
-                          }}
-                          required
-                        >
-                          <option value="">Select a repository</option>
-                          {repositories.map((repository) => <option key={repository.id} value={repository.id}>{repository.fullName}</option>)}
-                        </select>
-                      </div>
-                      <div className={styles.field}>
-                        <label className={styles.label} htmlFor="github-branch">Production branch</label>
-                        <input
-                          id="github-branch"
-                          className={styles.input}
-                          value={branch}
-                          onChange={(event) => setBranch(event.target.value)}
-                          placeholder="main"
-                          required
-                        />
-                      </div>
-                      <div className={styles.field}>
-                        <label className={styles.label} htmlFor="hosted-url">Hosted site URL</label>
-                        <input
-                          id="hosted-url"
-                          type="url"
-                          className={styles.input}
-                          value={hostedUrl}
-                          onChange={(event) => setHostedUrl(event.target.value)}
-                          placeholder="https://your-site.vercel.app"
-                          required
-                        />
-                      </div>
-                      {selectedRepositoryId && (
-                        <p className={styles.storedHint}>
-                          PATCHWORK stores this repository and its hosted URL. Edits are generated from the source via the GitHub App installation; the editor preview loads <strong>{hostedUrl.trim() || 'the hosted site'}</strong>.
-                        </p>
-                      )}
-                    </>
-                  ) : (
-                    <div className={styles.field}>
-                      <span className={styles.label}>No repositories are shared with PATCHWORK yet. Grant access to a repository on GitHub, then refresh.</span>
-                    </div>
-                  )}
-                  <button type="button" className={styles.cancelBtn} onClick={() => void refreshConnections()} disabled={isLoadingRepos}>
-                    {isLoadingRepos ? 'Refreshing…' : 'Refresh repositories'}
+                <div className={styles.field}>
+                  <label className={styles.label}>Website URL</label>
+                  <input
+                    type="url"
+                    placeholder="https://my-app.vercel.app"
+                    value={previewUrl}
+                    onChange={e => setPreviewUrl(e.target.value)}
+                    className={styles.input}
+                    required
+                  />
+                  <span className={styles.helperText}>Live deployed URL where the website is hosted</span>
+                </div>
+
+                <div className={styles.gridTwoCol}>
+                  <div className={styles.field}>
+                    <label className={styles.label}>Git Branch</label>
+                    <input
+                      type="text"
+                      placeholder="main"
+                      value={branch}
+                      onChange={e => setBranch(e.target.value)}
+                      className={styles.input}
+                    />
+                  </div>
+
+                  <div className={styles.field}>
+                    <label className={styles.label}>Category</label>
+                    <select
+                      value={category}
+                      onChange={e => setCategory(e.target.value as 'Ecommerce' | 'SaaS' | 'Docs')}
+                      className={styles.input}
+                    >
+                      <option value="Ecommerce">Ecommerce</option>
+                      <option value="SaaS">SaaS Platform</option>
+                      <option value="Docs">Documentation</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div className={styles.field}>
+                  <label className={styles.label}>GitHub Repository URL (Optional)</label>
+                  <input
+                    type="text"
+                    placeholder="https://github.com/my-org/my-repo"
+                    value={repoUrl}
+                    onChange={e => setRepoUrl(e.target.value)}
+                    className={styles.input}
+                  />
+                </div>
+
+                <div className={styles.modalActions}>
+                  <button type="button" className={styles.cancelBtn} onClick={() => setShowModal(false)}>
+                    Cancel
                   </button>
-                </>
-              ) : isAuthenticated && installation === null ? (
+                  <button type="submit" className={styles.submitBtn}>
+                    Connect & Open in Editor
+                  </button>
+                </div>
+              </form>
+            ) : (
+              <form onSubmit={handleConnectGitHub} className={styles.form}>
+                {requestError && <p className={styles.connectionError} role="alert">{requestError}</p>}
+                {!isAuthenticated && (
+                  <div className={styles.field}>
+                    <span className={styles.label}>Sign in with GitHub to connect an owned repository.</span>
+                    <button type="button" className={styles.submitBtn} onClick={onSignIn}>Sign in with GitHub</button>
+                  </div>
+                )}
+
                 <div className={styles.field}>
-                  <span className={styles.label}>Checking GitHub connection…</span>
+                  <label className={styles.label}>Website Name</label>
+                  <input
+                    type="text"
+                    placeholder="e.g. Acme Pet Store"
+                    value={name}
+                    onChange={e => setName(e.target.value)}
+                    className={styles.input}
+                    required
+                  />
                 </div>
-              ) : isAuthenticated ? (
-                <div className={styles.field}>
-                  <span className={styles.label}>Install the PATCHWORK GitHub App to list repositories.</span>
-                  <button type="button" className={styles.cancelBtn} onClick={() => void handleInstallGitHubApp()}>Install GitHub App</button>
-                </div>
-              ) : null}
-                </div>
+
+                {isAuthenticated && installation?.connected ? (
+                  <>
+                    {repositories.length > 0 ? (
+                      <>
+                        <div className={styles.field}>
+                          <label className={styles.label} htmlFor="github-repository">GitHub repository</label>
+                          <select
+                            id="github-repository"
+                            className={styles.input}
+                            value={selectedRepositoryId}
+                            onChange={(event) => {
+                              const id = event.target.value;
+                              setSelectedRepositoryId(id);
+                              setBranch(repositories.find((repo) => String(repo.id) === id)?.defaultBranch ?? 'main');
+                            }}
+                            required
+                          >
+                            <option value="">Select a repository</option>
+                            {repositories.map((repository) => <option key={repository.id} value={repository.id}>{repository.fullName}</option>)}
+                          </select>
+                        </div>
+                        <div className={styles.gridTwoCol}>
+                          <div className={styles.field}>
+                            <label className={styles.label} htmlFor="github-branch">Production branch</label>
+                            <input
+                              id="github-branch"
+                              className={styles.input}
+                              value={branch}
+                              onChange={(event) => setBranch(event.target.value)}
+                              placeholder="main"
+                              required
+                            />
+                          </div>
+                          <div className={styles.field}>
+                            <label className={styles.label}>Category</label>
+                            <select
+                              value={category}
+                              onChange={e => setCategory(e.target.value as 'Ecommerce' | 'SaaS' | 'Docs')}
+                              className={styles.input}
+                            >
+                              <option value="Ecommerce">Ecommerce</option>
+                              <option value="SaaS">SaaS Platform</option>
+                              <option value="Docs">Documentation</option>
+                            </select>
+                          </div>
+                        </div>
+                        <div className={styles.field}>
+                          <label className={styles.label} htmlFor="hosted-url">Hosted site URL</label>
+                          <input
+                            id="hosted-url"
+                            type="url"
+                            className={styles.input}
+                            value={hostedUrl}
+                            onChange={(event) => setHostedUrl(event.target.value)}
+                            placeholder="https://your-site.vercel.app"
+                            required
+                          />
+                        </div>
+                        {selectedRepositoryId && (
+                          <p className={styles.storedHint}>
+                            PATCHWORK stores this repository and its hosted URL. Edits are generated from the source via the GitHub App installation; the editor preview loads <strong>{hostedUrl.trim() || 'the hosted site'}</strong>.
+                          </p>
+                        )}
+                      </>
+                    ) : (
+                      <div className={styles.field}>
+                        <span className={styles.label}>No repositories are shared with PATCHWORK yet. Grant access to a repository on GitHub, then refresh.</span>
+                      </div>
+                    )}
+                    <button type="button" className={styles.cancelBtn} onClick={() => void refreshConnections()} disabled={isLoadingRepos}>
+                      {isLoadingRepos ? 'Refreshing…' : 'Refresh repositories'}
+                    </button>
+                  </>
+                ) : isAuthenticated && installation === null ? (
+                  <div className={styles.field}>
+                    <span className={styles.label}>Checking GitHub connection…</span>
+                  </div>
+                ) : isAuthenticated ? (
+                  <div className={styles.field}>
+                    <span className={styles.label}>Install the PATCHWORK GitHub App to list repositories.</span>
+                    <button type="button" className={styles.cancelBtn} onClick={() => void handleInstallGitHubApp()}>Install GitHub App</button>
+                  </div>
+                ) : null}
 
                 <div className={styles.modalActions}>
                   <button type="button" className={styles.cancelBtn} onClick={() => setShowModal(false)}>

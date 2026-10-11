@@ -47,7 +47,8 @@ const ALLOWED_EXTENSIONS = new Set([
   '.json', '.html', '.svg',
 ]);
 
-const HUNK_HEADER = /^@@(?: -(\d+)(?:,(\d+))? \+(\d+)(?:,(\d+))?)?.*(?:@@|$)/;
+const HUNK_HEADER = /^@@ -(\d+)(?:,(\d+))? \+(\d+)(?:,(\d+))? @@/;
+const LOOSE_HUNK_HEADER = /^@@(?: -(\d+)(?:,(\d+))? \+(\d+)(?:,(\d+))?)?.*(?:@@|$)/;
 
 function stripDiffPrefix(p: string): string {
   return p.replace(/^([ab]\/)/, '');
@@ -230,7 +231,7 @@ export function parseUnifiedDiff(diff: string, sourceCode?: string): { parsed?: 
       newPath = line.slice(4).trim();
       continue;
     }
-    const m = line.match(HUNK_HEADER);
+    const m = line.match(LOOSE_HUNK_HEADER);
     if (m && line.startsWith('@@')) {
       const hasNumbers = m[1] !== undefined && m[3] !== undefined;
       current = {

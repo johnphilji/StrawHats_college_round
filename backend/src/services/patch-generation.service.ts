@@ -178,9 +178,6 @@ export class PatchGenerationService {
         const normalizedDiff = normalizeUnifiedDiff(generated.diff, source.source);
         const validation = validatePatchDiff(normalizedDiff, entry.filePath, source.source);
         if (!validation.valid) throw validationError('Generated patch failed validation.', { errors: validation.errors });
-        const normalizedDiff = normalizeUnifiedDiff(generated.diff, source.source);
-        const validation = validatePatchDiff(normalizedDiff, entry.filePath, source.source);
-        if (!validation.valid) throw validationError('Generated patch failed validation.', { errors: validation.errors });
 
         const parsed = parseUnifiedDiff(normalizedDiff, source.source).parsed;
         if (!parsed) throw validationError('Generated patch could not be parsed.');
