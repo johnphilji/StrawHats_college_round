@@ -157,3 +157,417 @@
   overflow: hidden;
   height: 100%;
 }
+
+/* GitHub Workspace & Source Control layout */
+.repo-shell,
+.github-container {
+  width: min(1120px, calc(100% - 48px));
+  margin: 0 auto;
+  padding: 10px 0 34px;
+}
+
+.github-view {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  overflow-y: auto;
+  background: var(--bg-base);
+  padding: 0 20px;
+}
+
+.repo-topbar {
+  display: flex;
+  align-items: center;
+  gap: 22px;
+  min-height: 48px;
+  border-bottom: 1px solid #e8e7e3;
+  color: #777873;
+  font-size: 13px;
+}
+
+.wordmark {
+  margin-right: auto;
+  color: #1c201e;
+  font-size: 15px;
+  font-weight: 800;
+  letter-spacing: .08em;
+  text-decoration: none;
+}
+
+.wordmark span {
+  color: #b0d542;
+}
+
+.topbar .quiet {
+  margin-left: auto;
+}
+
+.card {
+  background: #fff;
+  border: 1px solid #e6e7e2;
+  border-radius: 14px;
+  box-shadow: 0 8px 28px #242c1610;
+}
+
+.login {
+  max-width: 510px;
+  margin: 12vh auto;
+  padding: 48px;
+}
+
+.eyebrow {
+  color: #7c853d;
+  font-size: 10px;
+  font-weight: 750;
+  letter-spacing: .14em;
+}
+
+h1 {
+  margin: 11px 0 10px;
+  color: #202420;
+  font-size: clamp(28px, 4vw, 39px);
+  letter-spacing: -.04em;
+}
+
+h2 {
+  margin: 8px 0 0;
+  color: #252a25;
+  font-size: 19px;
+  letter-spacing: -.025em;
+}
+
+.login>p,
+.welcome p {
+  max-width: 520px;
+  color: #73766e;
+  font-size: 14px;
+  line-height: 1.7;
+}
+
+.primary,
+.outline,
+.quiet {
+  min-height: 40px;
+  padding: 0 15px;
+  border: 0;
+  border-radius: 7px;
+  cursor: pointer;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 650;
+}
+
+.primary {
+  background: #252a25;
+  color: white;
+}
+
+.primary:hover {
+  background: #3e4734;
+}
+
+.primary:disabled {
+  cursor: not-allowed;
+  opacity: .6;
+}
+
+.github {
+  display: flex;
+  width: 100%;
+  justify-content: center;
+  align-items: center;
+  gap: 9px;
+  margin: 24px 0 10px;
+}
+
+.github span {
+  font-size: 18px;
+}
+
+.login small {
+  color: #888;
+}
+
+.welcome {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 20px;
+  padding: 50px 0 30px;
+}
+
+.welcome p {
+  margin-bottom: 0;
+}
+
+.layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1.2fr) minmax(320px, .8fr);
+  gap: 18px;
+  align-items: start;
+}
+
+.repo-card,
+.source-card {
+  min-height: 395px;
+  padding: 23px;
+}
+
+.section-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+}
+
+.quiet {
+  background: transparent;
+  color: #666b62;
+}
+
+.quiet:hover {
+  background: #f3f4ef;
+}
+
+.repo-list {
+  margin: 19px -8px 0;
+  padding: 0;
+  list-style: none;
+}
+
+.repo-list li+li {
+  border-top: 1px solid #eff0ec;
+}
+
+.repo-row {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  gap: 12px;
+  padding: 13px 9px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+}
+
+.repo-row:hover,
+.repo-row.active {
+  background: #f5f7ef;
+}
+
+.repo-icon {
+  display: grid;
+  width: 32px;
+  height: 32px;
+  place-items: center;
+  border: 1px solid #e7e8e3;
+  border-radius: 8px;
+  color: #545c3c;
+}
+
+.repo-copy {
+  display: grid;
+  flex: 1;
+  gap: 4px;
+  min-width: 0;
+}
+
+.repo-copy strong {
+  overflow: hidden;
+  color: #30342f;
+  font-size: 13px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.repo-copy small {
+  overflow: hidden;
+  color: #888b83;
+  font-size: 11px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.badge {
+  flex: 0 0 auto;
+  padding: 5px 8px;
+  border-radius: 99px;
+  background: #f0f2e7;
+  color: #68733c;
+  font-size: 10px;
+  font-weight: 650;
+}
+
+.empty {
+  padding: 45px 20px 15px;
+  text-align: center;
+}
+
+.empty-icon {
+  display: grid;
+  width: 43px;
+  height: 43px;
+  margin: auto;
+  place-items: center;
+  border-radius: 12px;
+  background: #f3f5eb;
+  color: #68733c;
+  font-size: 21px;
+}
+
+.empty h3 {
+  margin: 15px 0 5px;
+  color: #30342f;
+  font-size: 15px;
+}
+
+.empty p,
+.muted {
+  color: #81847c;
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.outline {
+  margin-top: 10px;
+  border: 1px solid #dfe1d8;
+  background: white;
+  color: #43483c;
+}
+
+.outline:hover {
+  background: #f7f8f3;
+}
+
+.source-card>.muted {
+  margin: 8px 0 20px;
+}
+
+form {
+  display: grid;
+  gap: 9px;
+}
+
+form label {
+  margin-top: 7px;
+  color: #565a52;
+  font-size: 11px;
+  font-weight: 650;
+}
+
+input {
+  width: 100%;
+  height: 40px;
+  box-sizing: border-box;
+  padding: 0 11px;
+  border: 1px solid #dfe1dc;
+  border-radius: 7px;
+  outline: none;
+  color: #30342f;
+  font: inherit;
+  font-size: 12px;
+}
+
+input:focus {
+  border-color: #a6b66c;
+  box-shadow: 0 0 0 3px #a6b66c25;
+}
+
+form .primary {
+  margin-top: 8px;
+}
+
+.source-empty {
+  display: grid;
+  min-height: 245px;
+  align-content: center;
+  justify-items: center;
+  text-align: center;
+  color: #898c84;
+}
+
+.source-empty span {
+  color: #a8b279;
+  font-size: 34px;
+}
+
+.source-empty p {
+  max-width: 240px;
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.preview {
+  margin-top: 18px;
+  padding: 22px;
+}
+
+.preview pre {
+  max-height: 500px;
+  overflow: auto;
+  margin: 17px 0 0;
+  padding: 17px;
+  border-radius: 9px;
+  background: #20251f;
+  color: #e1e7d8;
+  font: 12px/1.65 ui-monospace, SFMono-Regular, Consolas, monospace;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.notice,
+.error {
+  padding: 10px 13px;
+  border-radius: 7px;
+  font-size: 12px;
+}
+
+.notice {
+  background: #f0f5e5;
+  color: #596532;
+}
+
+.error {
+  background: #fff0ed;
+  color: #a23f32;
+}
+
+footer {
+  padding-top: 44px;
+  color: #969890;
+  font-size: 10px;
+  letter-spacing: .04em;
+}
+
+footer span {
+  color: #acbd6c;
+}
+
+@media (max-width: 750px) {
+  .shell {
+    width: min(100% - 30px, 560px);
+  }
+
+  .welcome {
+    align-items: flex-start;
+    flex-direction: column;
+    padding-top: 35px;
+  }
+
+  .layout {
+    grid-template-columns: 1fr;
+  }
+
+  .repo-card,
+  .source-card {
+    min-height: auto;
+  }
+
+  .login {
+    margin: 8vh auto;
+    padding: 30px 23px;
+  }
+}

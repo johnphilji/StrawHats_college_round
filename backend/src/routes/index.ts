@@ -12,7 +12,7 @@ import releasesRoutes from '../modules/releases/releases.routes';
 
 const router = Router();
 
-router.use('/health', healthRoutes);
+router.use("/health", healthRoutes);
 router.use(patchesRoutes);
 router.use('/projects', projectsRoutes);
 router.use('/llm', llmRoutes);

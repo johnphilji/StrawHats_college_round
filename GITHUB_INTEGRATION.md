@@ -40,8 +40,10 @@ Authorization: Bearer <supabase_access_token>
 
 - `POST /api/github/installation/setup` starts the GitHub App install flow.
 - `GET /api/github/callback?installation_id=...&setup_action=install&state=...` is the GitHub App callback; it is state-authenticated and does not accept a browser bearer token.
+- `GET /api/github/installation` returns the requesting user's linked installation (`{ connected, installationId? }`) without calling GitHub, so the UI can render installed/not-connected states.
 - `GET /api/github/repositories?page=1&per_page=50` returns a page (up to 100) of repositories visible to the user's linked installation.
 - `GET /api/github/repositories/:repositoryId` returns repository metadata if the installation can access that repository.
+- `GET /api/github/repositories/:repositoryId/patchwork?ref=main` reports whether the repository carries a `patchwork-registry.json` manifest for the visual editing workflow (`{ supported, componentCount? | reason: no-manifest | invalid-manifest | manifest-unavailable }`).
 - `GET /api/github/repositories/:repositoryId/source?path=src%2FApp.tsx&ref=main` retrieves one allowed source file (256 KB maximum).
 
 Example list response:
@@ -87,5 +89,9 @@ Example source response:
 ```
 
 Repository operations accept only numeric GitHub repository IDs. The backend obtains each installation token itself and asks GitHub to resolve the repository through that installation before metadata or file access. It never accepts API URLs or trusts an owner/name pair from the client. Source paths must be relative, cannot traverse directories, and are limited to source/documentation extensions; environment, credential, secret, and private key files are blocked. Only one file is returned per request.
+
+## Editing-pipeline wiring
+
+`GithubAppService.createRepositoryProvider(user, repositoryId, ref?)` returns a `RepositoryProvider` (same contract as the local provider) bound to one verified installation + repository + ref: `SourceService` and `EditOrchestrationService` already accept any `RepositoryProvider`, so a selected GitHub repository can later participate in the validated editing workflow with no interface changes. Reads mint short-lived installation tokens per call and perform no writes. The local provider remains the default; provider selection stays explicit at the call site so local development and tests are unaffected. Use `GET .../patchwork` first: repositories without a valid `patchwork-registry.json` manifest are reported unsupported rather than edited blindly.
 
 The source response is ready for a later code-generation workflow. The existing component registry and local source resolver remain unchanged; the GitHub endpoint supports selecting a repository file before a project-specific registry mapping exists.

@@ -331,3 +331,187 @@ describe('GithubAppService', () => {
     expect(JSON.stringify(result)).not.toContain('temporary');
   });
 });
+
+describe('GithubAppService configuration and identity', () => {
+  const noConfig = { appId: undefined, appSlug: undefined, privateKey: undefined } as const;
+
+  function unconfiguredService(fetcher?: typeof fetch) {
+    return new GithubAppService({
+      ...noConfig,
+      frontendUrl: 'http://localhost:5173',
+      supabaseUrl: 'https://example.supabase.co',
+      supabaseSecretKey: 'server-secret',
+      fetcher: fetcher ?? (vi.fn() as unknown as typeof fetch),
+      resolveGithubAccountId: async () => '42',
+      saveInstallation: async () => {},
+    });
+  }
+
+  it('reports not-configured for setup, listing, and installation status without credentials', async () => {
+    const service = unconfiguredService();
+    await expect(service.createSetupUrl(user.id)).rejects.toMatchObject({ statusCode: 503, code: 'CONFIGURATION_ERROR' });
+    await expect(service.listRepositories(user)).rejects.toMatchObject({ statusCode: 503, code: 'CONFIGURATION_ERROR' });
+    await expect(service.getInstallation(user)).rejects.toMatchObject({ statusCode: 503, code: 'CONFIGURATION_ERROR' });
+  });
+
+  it('refuses setup when the Supabase user has no linked GitHub identity', async () => {
+    const service = makeService(vi.fn() as unknown as typeof fetch, { resolveGithubAccountId: async () => null });
+    await expect(service.createSetupUrl(user.id)).rejects.toMatchObject({ statusCode: 403 });
+  });
+
+  it('returns an empty page when the installation can access no repositories', async () => {
+    const fetcher = vi.fn(async (input: string | URL) =>
+      String(input).endsWith('/access_tokens')
+        ? response({ token: 'temporary' })
+        : response({ total_count: 0, repositories: [] }),
+    );
+    const result = await makeService(fetcher as unknown as typeof fetch).listRepositories(user);
+    expect(result).toEqual({ repositories: [], page: 1, perPage: 50, hasMore: false });
+  });
+
+  it('maps GitHub rate-limit and transport failures to 502 without leaking tokens', async () => {
+    const fetcher = vi.fn(async (input: string | URL) => {
+      const url = String(input);
+      if (url.endsWith('/access_tokens')) return response({ token: 'installation-secret' });
+      return response({ message: 'API rate limit exceeded' }, 429);
+    });
+    await expect(makeService(fetcher as unknown as typeof fetch).listRepositories(user)).rejects.toMatchObject({ statusCode: 502 });
+  });
+
+  it('rejects invalid refs before reading source', async () => {
+    const fetcher = vi.fn(async (input: string | URL) => {
+      const url = String(input);
+      if (url.endsWith('/access_tokens')) return response({ token: 'temporary' });
+      if (url.endsWith('/repositories/7123')) return response(repo);
+      throw new Error('Unexpected URL');
+    });
+    const service = makeService(fetcher as unknown as typeof fetch);
+    await expect(service.readSource(user, '7123', 'src/App.tsx', '../evil')).rejects.toMatchObject({ statusCode: 400 });
+    await expect(service.readSource(user, '7123', 'src/App.tsx', '/abs')).rejects.toMatchObject({ statusCode: 400 });
+  });
+
+  it('reports installation linkage without exposing tokens', async () => {
+    const service = makeService(vi.fn() as unknown as typeof fetch);
+    expect(await service.getInstallation(user)).toEqual({ connected: true, installationId: 456 });
+    expect(await service.getInstallation({ id: 'supabase-user-2' })).toEqual({ connected: false });
+    expect(JSON.stringify(await service.getInstallation(user))).not.toContain('secret');
+  });
+
+  it('isolates installations per user: a user without a linkage cannot list', async () => {
+    const fetcher = vi.fn() as unknown as typeof fetch;
+    await expect(makeService(fetcher).listRepositories({ id: 'supabase-user-2' })).rejects.toMatchObject({ statusCode: 403 });
+    expect(fetcher).not.toHaveBeenCalled();
+  });
+
+  it('mints per-installation tokens, never reusing another installation', async () => {
+    const seen: string[] = [];
+    const fetcher = vi.fn(async (input: string | URL) => {
+      const url = String(input);
+      seen.push(url);
+      if (url.endsWith('/access_tokens')) return response({ token: 'temporary' });
+      if (url.includes('/installation/repositories')) return response({ total_count: 0, repositories: [] });
+      throw new Error('Unexpected URL');
+    });
+    const other = { id: 'supabase-user-9', app_metadata: { patchwork_github_installation_id: 777 } };
+    await makeService(fetcher as unknown as typeof fetch).listRepositories(other);
+    expect(seen.some((url) => url.includes('/app/installations/777/access_tokens'))).toBe(true);
+    expect(seen.some((url) => url.includes('/app/installations/456/'))).toBe(false);
+  });
+});
+
+describe('GithubAppService PATCHWORK manifest support', () => {
+  const manifest = JSON.stringify({ schemaVersion: 1, components: [{ id: 'a' }, { id: 'b' }, { id: 'c' }] });
+
+  function manifestService(manifestResponse: (url: string) => unknown) {
+    const fetcher = vi.fn(async (input: string | URL) => {
+      const url = String(input);
+      if (url.endsWith('/access_tokens')) return response({ token: 'temporary' });
+      if (url.endsWith('/repositories/7123')) return response(repo);
+      return manifestResponse(url) as Response;
+    });
+    return makeService(fetcher as unknown as typeof fetch);
+  }
+
+  it('reports supported repositories with a component count', async () => {
+    const body = manifest;
+    const service = manifestService((url) =>
+      url.includes('/contents/patchwork-registry.json')
+        ? response({ type: 'file', size: Buffer.byteLength(body), encoding: 'base64', content: Buffer.from(body).toString('base64'), path: 'patchwork-registry.json' })
+        : response({}, 404),
+    );
+    const result = await service.checkPatchworkSupport(user, '7123');
+    expect(result.supported).toBe(true);
+    if (result.supported) expect(result.componentCount).toBe(3);
+  });
+
+  it('reports missing manifests instead of throwing', async () => {
+    const service = manifestService(() => response({}, 404));
+    const result = await service.checkPatchworkSupport(user, '7123');
+    expect(result).toMatchObject({ supported: false, reason: 'no-manifest' });
+  });
+
+  it('reports invalid manifests instead of throwing', async () => {
+    const bad = 'not json{{{';
+    const service = manifestService(() =>
+      response({ type: 'file', size: bad.length, encoding: 'base64', content: Buffer.from(bad).toString('base64'), path: 'patchwork-registry.json' }),
+    );
+    const result = await service.checkPatchworkSupport(user, '7123');
+    expect(result).toMatchObject({ supported: false, reason: 'invalid-manifest' });
+  });
+
+  it('rejects repositories outside the authorized installation', async () => {
+    const fetcher = vi.fn(async (input: string | URL) =>
+      String(input).endsWith('/access_tokens') ? response({ token: 'temporary' }) : response({}, 404),
+    );
+    await expect(makeService(fetcher as unknown as typeof fetch).checkPatchworkSupport(user, '9999')).rejects.toMatchObject({ statusCode: 404 });
+  });
+});
+
+describe('GithubRepositoryProvider via createRepositoryProvider', () => {
+  const body = 'export const value = 42;';
+
+  function providerService() {
+    const fetcher = vi.fn(async (input: string | URL | Request) => {
+      const url = String(input);
+      if (url.endsWith('/access_tokens')) return response({ token: 'temporary' });
+      if (url.endsWith('/repositories/7123')) return response(repo);
+      if (url.includes('/contents/src/App.tsx')) {
+        return response({ type: 'file', size: Buffer.byteLength(body), encoding: 'base64', content: Buffer.from(body).toString('base64'), path: 'src/App.tsx' });
+      }
+      return response({}, 404);
+    });
+    return makeService(fetcher as unknown as typeof fetch);
+  }
+
+  it('reads authorized files through the installation-bound provider', async () => {
+    const provider = await providerService().createRepositoryProvider(user, '7123');
+    expect(provider.getRepositoryRoot()).toBe('github:acme/demo@main');
+    await expect(provider.readFile('src/App.tsx')).resolves.toBe(body);
+    await expect(provider.fileExists('src/App.tsx')).resolves.toBe(true);
+    await expect(provider.fileExists('src/Missing.tsx')).resolves.toBe(false);
+  });
+
+  it('rejects repositories outside the installation and invalid refs', async () => {
+    const service = providerService();
+    await expect(service.createRepositoryProvider(user, '9999')).rejects.toMatchObject({ statusCode: 404 });
+    await expect(service.createRepositoryProvider(user, '7123', '../evil')).rejects.toMatchObject({ statusCode: 400 });
+  });
+
+  it('respects an explicit authorized ref in reads and labels', async () => {
+    const seen: string[] = [];
+    const fetcher = vi.fn(async (input: string | URL | Request) => {
+      const url = String(input);
+      seen.push(url);
+      if (url.endsWith('/access_tokens')) return response({ token: 'temporary' });
+      if (url.endsWith('/repositories/7123')) return response(repo);
+      if (url.includes('/contents/src/App.tsx')) {
+        return response({ type: 'file', size: Buffer.byteLength(body), encoding: 'base64', content: Buffer.from(body).toString('base64'), path: 'src/App.tsx' });
+      }
+      return response({}, 404);
+    });
+    const provider = await makeService(fetcher as unknown as typeof fetch).createRepositoryProvider(user, '7123', 'develop');
+    expect(provider.getRepositoryRoot()).toBe('github:acme/demo@develop');
+    await provider.readFile('src/App.tsx');
+    expect(seen.some((url) => url.includes('ref=develop'))).toBe(true);
+  });
+});

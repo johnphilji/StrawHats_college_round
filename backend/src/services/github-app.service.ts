@@ -3,6 +3,8 @@ import { createClient } from '@supabase/supabase-js';
 import { getEnv } from '../config/env';
 import { badRequest, conflict, forbidden, notFound, AppError } from '../shared/errors/AppError';
 import type { AuthenticatedUser } from '../shared/types/api';
+import type { RepositoryProvider } from '../types/component.types';
+import { GithubRepositoryProvider } from './repository-provider.service';
 
 const API = 'https://api.github.com';
 const MAX_FILE_BYTES = 256 * 1024;
@@ -161,7 +163,11 @@ export class GithubAppService {
   private async github<T>(url: string, token: string, init: RequestInit = {}): Promise<T> {
     const response = await this.githubResponse(url, token, init);
     if (!response.ok) {
-      if (response.status === 404 || response.status === 403) throw forbidden('GitHub did not authorize this repository operation.');
+      // Preserve the distinction: callers map 404 to "not found / not visible
+      // to this installation" (including fileExists -> false) while 403 keeps
+      // its authorization meaning (revoked installation, rate-limited token).
+      if (response.status === 404) throw notFound('GitHub resource was not found.');
+      if (response.status === 403) throw forbidden('GitHub did not authorize this repository operation.');
       if (response.status === 409 || response.status === 422) throw conflict('GitHub rejected the repository operation because its state or permissions do not allow it.');
       throw new AppError('GitHub repository service is temporarily unavailable.', { statusCode: 502, code: 'INTERNAL_ERROR' });
     }
@@ -210,6 +216,19 @@ export class GithubAppService {
     const token = await this.installationToken(user);
     const result = await this.github<{ total_count: number; repositories: GithubRepository[] }>(`${API}/installation/repositories?per_page=${perPage}&page=${page}`, token);
     return { repositories: result.repositories.map((repo) => this.safeRepository(repo)), page, perPage, hasMore: page * perPage < result.total_count };
+  }
+
+  /**
+   * Reports whether the requesting user has a linked GitHub App installation.
+   * Reads only the server-side association (Supabase app_metadata) and never
+   * exposes tokens. Used by the frontend to render installed/not-connected
+   * states without triggering a repository fetch.
+   */
+  async getInstallation(user: AuthenticatedUser): Promise<{ connected: boolean; installationId?: number }> {
+    this.assertConfigured();
+    const installationId = (user.app_metadata as Record<string, unknown> | undefined)?.patchwork_github_installation_id;
+    if (!Number.isSafeInteger(installationId) || Number(installationId) < 1) return { connected: false };
+    return { connected: true, installationId: Number(installationId) };
   }
 
   private safeRepository(repo: GithubRepository) {
@@ -402,8 +421,7 @@ export class GithubAppService {
     return this.safeRepository(repo);
   }
 
-  async readSource(user: AuthenticatedUser, id: string, filePath: string, ref?: string) {
-    const { token, repo } = await this.authorizedRepository(user, id);
+  async readSource(user: AuthenticatedUser, id: string, filePath: string, ref?: string) {    const { token, repo } = await this.authorizedRepository(user, id);
     if (typeof filePath !== 'string' || !filePath.trim() || filePath.length > 500 || /[\\\u0000-\u001f\u007f]/.test(filePath) || filePath.startsWith('/') || filePath.split('/').some((part) => !part || part === '.' || part === '..')) throw badRequest('Source path must be a safe relative file path.');
     const parts = filePath.split('/');
     if (parts.some((part, index) => BLOCKED_NAMES.test(part) || (index < parts.length - 1 && BLOCKED_DIRECTORIES.has(part.toLowerCase()))) || !SOURCE_EXTENSIONS.has(filePath.slice(filePath.lastIndexOf('.') ).toLowerCase())) throw forbidden('This file type is not available for source retrieval.');
@@ -415,6 +433,76 @@ export class GithubAppService {
     const source = Buffer.from(content.content, 'base64').toString('utf8');
     if (Buffer.byteLength(source, 'utf8') > MAX_FILE_BYTES) throw forbidden('File exceeds the source size limit.');
     return { repository: this.safeRepository(repo), path: content.path, ref: ref ?? repo.default_branch, source, size: Buffer.byteLength(source, 'utf8') };
+  }
+
+  /**
+   * Verifies whether an authorized repository carries the PATCHWORK manifest
+   * (`patchwork-registry.json` at the repository root) that the visual
+   * editing workflow needs to map selected elements to source files.
+   * Never throws for a merely-unsupported repository; missing/invalid
+   * manifests are reported as data so the UI can explain them.
+   */
+  async checkPatchworkSupport(user: AuthenticatedUser, id: string, ref?: string) {
+    const { repo } = await this.authorizedRepository(user, id);
+    const repository = this.safeRepository(repo);
+    const effectiveRef = ref ?? repo.default_branch;
+    let source: string;
+    try {
+      source = (await this.readSource(user, String(repo.id), 'patchwork-registry.json', effectiveRef)).source;
+    } catch (error) {
+      if (error instanceof AppError && error.statusCode === 404) {
+        return { supported: false as const, reason: 'no-manifest', repository, ref: effectiveRef };
+      }
+      if (error instanceof AppError && error.statusCode === 403) {
+        return { supported: false as const, reason: 'manifest-unavailable', repository, ref: effectiveRef };
+      }
+      // Invalid refs (400) and transport errors propagate to the caller.
+      throw error;
+    }
+    try {
+      const manifest = JSON.parse(source) as { components?: unknown };
+      const componentCount = Array.isArray(manifest.components) ? manifest.components.length : 0;
+      if (componentCount < 1) return { supported: false as const, reason: 'invalid-manifest', repository, ref: effectiveRef };
+      return { supported: true as const, repository, ref: effectiveRef, componentCount };
+    } catch {
+      return { supported: false as const, reason: 'invalid-manifest', repository, ref: effectiveRef };
+    }
+  }
+
+  /**
+   * Builds a {@link RepositoryProvider} bound to one authorized repository
+   * and ref, so the selected GitHub repository can later participate in the
+   * existing resolve → source → validate editing pipeline (SourceService /
+   * EditOrchestrationService accept any RepositoryProvider). The provider
+   * closes over the verified repository identity — callers cannot redirect
+   * it to another repository — and mints short-lived installation tokens per
+   * read through the existing flow. It performs no writes: no commits,
+   * pushes, merges, or deployments happen here.
+   */
+  async createRepositoryProvider(user: AuthenticatedUser, id: string, ref?: string): Promise<RepositoryProvider> {
+    const { repo } = await this.authorizedRepository(user, id);
+    const repositoryId = String(repo.id);
+    const effectiveRef = ref ?? repo.default_branch;
+    if (ref !== undefined) {
+      // Fail fast on malformed refs using the same rule as readSource.
+      if (ref.length > 255 || !/^[A-Za-z0-9._/-]+$/.test(ref) || ref.includes('..') || ref.startsWith('/') || ref.endsWith('/')) {
+        throw badRequest('Invalid repository ref.');
+      }
+    }
+    const label = `github:${repo.owner.login}/${repo.name}@${effectiveRef}`;
+    return new GithubRepositoryProvider(label, {
+      readContent: (relativeFilePath: string) =>
+        this.readSource(user, repositoryId, relativeFilePath, effectiveRef).then((result) => result.source),
+      contentExists: async (relativeFilePath: string) => {
+        try {
+          await this.readSource(user, repositoryId, relativeFilePath, effectiveRef);
+          return true;
+        } catch (error) {
+          if (error instanceof AppError && error.statusCode === 404) return false;
+          throw error;
+        }
+      },
+    });
   }
 }
 
