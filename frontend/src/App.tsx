@@ -14,7 +14,9 @@ import type { Session } from '@supabase/supabase-js';
 import { supabase } from './lib/supabase';
 
 export default function App() {
-  const [activeView, setActiveView]         = useState<string>('editor');
+  const [activeView, setActiveView]         = useState<string>(() =>
+    new URLSearchParams(window.location.search).get('github_connected') === '1' ? 'websites' : 'editor',
+  );
   const [currentWebsite, setCurrentWebsite] = useState<ConnectedWebsite>(MOCK_WEBSITES[0]);
   const [selected, setSelected]             = useState<SelectedComponent | null>(null);
   const [activeChange, setActiveChange]     = useState<CodeChange | null>(null);
@@ -87,7 +89,7 @@ export default function App() {
                 : activeView === 'deploy'
                 ? 'Releases & Rollback'
                 : activeView === 'websites'
-                ? 'Connected Repositories'
+                ? 'Connected Repos'
                 : 'Audit Log'}
             </span>
           </div>

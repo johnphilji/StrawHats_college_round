@@ -5,12 +5,13 @@ export const projectsController = {
   async create(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
       // Zod validation already handled in route, but we re-validate body from req
-      const { name, description, repositoryUrl, repositoryIdentifier, productionBranch } = req.body as {
+      const { name, description, repositoryUrl, repositoryIdentifier, productionBranch, productionUrl } = req.body as {
         name: string;
         description?: string;
         repositoryUrl?: string;
         repositoryIdentifier?: string;
         productionBranch?: string;
+        productionUrl?: string;
       };
       const ownerId = req.user!.id;
 
@@ -20,6 +21,7 @@ export const projectsController = {
         repositoryUrl,
         repositoryIdentifier,
         productionBranch,
+        productionUrl,
         ownerId,
       });
 

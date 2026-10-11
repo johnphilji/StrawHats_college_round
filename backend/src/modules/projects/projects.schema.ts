@@ -7,6 +7,7 @@ export const createProjectSchema = z.object({
     repositoryUrl: z.string().url().optional(),
     repositoryIdentifier: z.string().min(1).max(200).optional(),
     productionBranch: z.string().min(1).max(100).default('main'),
+    productionUrl: z.string().url().max(2_048).optional(),
   }),
   query: z.object({}).passthrough().optional(),
   params: z.object({}).optional(),
@@ -23,6 +24,7 @@ export const updateProjectSchema = z.object({
     repositoryUrl: z.string().url().max(2_048).nullable().optional(),
     repositoryIdentifier: z.string().trim().min(1).max(200).nullable().optional(),
     productionBranch: z.string().trim().min(1).max(255).optional(),
+    productionUrl: z.string().url().max(2_048).nullable().optional(),
   }).strict().refine((data) => Object.keys(data).length > 0, 'At least one field must be provided.'),
   params: projectIdParamSchema,
 });

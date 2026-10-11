@@ -1,12 +1,14 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import styles from './WebsitesView.module.css';
 import type { ConnectedWebsite } from './types';
 import { MOCK_WEBSITES } from './api';
 import {
   beginGitHubInstallation,
   createProject,
+  fetchGitHubInstallation,
   fetchGitHubRepositories,
   fetchProjects,
+  type GitHubInstallation,
   type GitHubRepository,
   type ProjectRecord,
 } from './api-client';
@@ -15,6 +17,17 @@ interface WebsitesViewProps {
   onSelectWebsite: (website: ConnectedWebsite) => void;
   isAuthenticated: boolean;
   onSignIn: () => void;
+}
+
+interface Connections {
+  installation: GitHubInstallation;
+  repositories: GitHubRepository[];
+}
+
+const GITHUB_CONNECTED_PARAM = 'github_connected';
+
+function cameBackFromInstallation(): boolean {
+  return new URLSearchParams(window.location.search).get(GITHUB_CONNECTED_PARAM) === '1';
 }
 
 function projectToWebsite(project: ProjectRecord, repository?: GitHubRepository): ConnectedWebsite {
@@ -29,8 +42,8 @@ function projectToWebsite(project: ProjectRecord, repository?: GitHubRepository)
     repoOwner: repository?.owner ?? ownerAndName?.[1] ?? 'github',
     repoName: repository?.name ?? ownerAndName?.[2] ?? project.name,
     branch: project.productionBranch,
-    previewUrl: repository?.url ?? project.repositoryUrl ?? '',
-    productionUrl: repository?.url ?? project.repositoryUrl ?? '',
+    previewUrl: project.productionUrl ?? repository?.url ?? project.repositoryUrl ?? '',
+    productionUrl: project.productionUrl ?? repository?.url ?? project.repositoryUrl ?? '',
     status: 'connected',
     mode: 'managed',
     runtimeLoaderInstalled: false,
@@ -45,13 +58,47 @@ function projectToWebsite(project: ProjectRecord, repository?: GitHubRepository)
 }
 
 export default function WebsitesView({ onSelectWebsite, isAuthenticated, onSignIn }: WebsitesViewProps) {
-  const [websites, setWebsites] = useState<ConnectedWebsite[]>(MOCK_WEBSITES);
-  const [showModal, setShowModal] = useState(false);
+  const [websites, setWebsites] = useState<ConnectedWebsite[]>(isAuthenticated ? [] : MOCK_WEBSITES);
+  const [showModal, setShowModal] = useState(cameBackFromInstallation);
   const [name, setName] = useState('');
   const [selectedRepositoryId, setSelectedRepositoryId] = useState('');
+  const [branch, setBranch] = useState('');
+  const [hostedUrl, setHostedUrl] = useState('');
   const [repositories, setRepositories] = useState<GitHubRepository[]>([]);
+  const [installation, setInstallation] = useState<GitHubInstallation | null>(null);
   const [requestError, setRequestError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(() =>
+    cameBackFromInstallation() ? 'GitHub connected. Pick a repository below to add it to PATCHWORK.' : null,
+  );
   const [isConnecting, setIsConnecting] = useState(false);
+  const [isLoadingRepos, setIsLoadingRepos] = useState(false);
+
+  const fetchConnections = useCallback(async (signal?: AbortSignal): Promise<Connections> => {
+    const [install, repos] = await Promise.all([
+      fetchGitHubInstallation(signal).catch(() => ({ connected: false } as GitHubInstallation)),
+      fetchGitHubRepositories(signal).catch(() => ({ repositories: [], hasMore: false })),
+    ]);
+    return { installation: install, repositories: repos.repositories };
+  }, []);
+
+  const applyConnections = useCallback((result: Connections) => {
+    setInstallation(result.installation);
+    setRepositories(result.repositories);
+  }, []);
+
+  const refreshConnections = useCallback(async () => {
+    setIsLoadingRepos(true);
+    try {
+      applyConnections(await fetchConnections());
+    } finally {
+      setIsLoadingRepos(false);
+    }
+  }, [applyConnections, fetchConnections]);
+
+  // Strip the one-shot callback query param once the app has read it.
+  useEffect(() => {
+    if (cameBackFromInstallation()) window.history.replaceState({}, '', window.location.pathname);
+  }, []);
 
   useEffect(() => {
     if (!isAuthenticated) return;
@@ -59,18 +106,20 @@ export default function WebsitesView({ onSelectWebsite, isAuthenticated, onSignI
     fetchProjects(controller.signal)
       .then((projects) => {
         const projectSites = projects.map((project) => projectToWebsite(project));
-        setWebsites([...MOCK_WEBSITES, ...projectSites]);
+        setWebsites(projectSites);
       })
       .catch((error: unknown) => {
         if (!controller.signal.aborted) setRequestError(error instanceof Error ? error.message : 'Could not load projects.');
       });
-    fetchGitHubRepositories(controller.signal)
-      .then((result) => setRepositories(result.repositories))
-      .catch(() => {
-        if (!controller.signal.aborted) setRepositories([]);
+    fetchConnections(controller.signal)
+      .then((result) => {
+        if (!controller.signal.aborted) applyConnections(result);
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) setIsLoadingRepos(false);
       });
     return () => controller.abort();
-  }, [isAuthenticated]);
+  }, [isAuthenticated, applyConnections, fetchConnections]);
 
   const handleConnect = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -80,6 +129,15 @@ export default function WebsitesView({ onSelectWebsite, isAuthenticated, onSignI
     }
     const repository = repositories.find((item) => String(item.id) === selectedRepositoryId);
     if (!name.trim() || !repository) return;
+    const productionUrl = hostedUrl.trim();
+    if (productionUrl) {
+      try {
+        new URL(productionUrl);
+      } catch {
+        setRequestError('Enter a valid hosted site URL, e.g. https://your-site.vercel.app');
+        return;
+      }
+    }
     setIsConnecting(true);
     setRequestError(null);
     try {
@@ -87,13 +145,17 @@ export default function WebsitesView({ onSelectWebsite, isAuthenticated, onSignI
         name: name.trim(),
         repositoryUrl: repository.url,
         repositoryIdentifier: String(repository.id),
-        productionBranch: repository.defaultBranch,
+        productionBranch: branch.trim() || repository.defaultBranch,
+        ...(productionUrl ? { productionUrl } : {}),
       });
       const site = projectToWebsite(project, repository);
       setWebsites((current) => [site, ...current.filter((item) => item.projectId !== site.projectId)]);
       setShowModal(false);
+      setNotice(null);
       setName('');
       setSelectedRepositoryId('');
+      setBranch('');
+      setHostedUrl('');
       onSelectWebsite(site);
     } catch (error) {
       setRequestError(error instanceof Error ? error.message : 'Could not connect this repository.');
@@ -103,6 +165,7 @@ export default function WebsitesView({ onSelectWebsite, isAuthenticated, onSignI
   };
 
   const handleInstallGitHubApp = async () => {
+    setRequestError(null);
     try {
       const { url } = await beginGitHubInstallation();
       window.location.assign(url);
@@ -116,15 +179,22 @@ export default function WebsitesView({ onSelectWebsite, isAuthenticated, onSignI
       {/* Header */}
       <div className={styles.header}>
         <div>
-          <h1 className={styles.title}>Connected Websites</h1>
+          <h1 className={styles.title}>Connected Repos</h1>
           <p className={styles.subtitle}>
-            Select a website to load its preview and start visual editing. PATCHWORK connects directly to your Git repository.
+            Select a repository to load its preview and start visual editing. PATCHWORK connects directly to your Git repository.
           </p>
         </div>
 
-        <button className={styles.connectBtn} onClick={() => setShowModal(true)}>
-          + Connect Website
-        </button>
+        <div className={styles.headerActions}>
+          {isAuthenticated && installation && (
+            <span className={installation.connected ? styles.statusPillOn : styles.statusPillOff}>
+              {installation.connected ? 'GitHub App connected' : 'GitHub App not installed'}
+            </span>
+          )}
+          <button className={styles.connectBtn} onClick={() => { setNotice(null); setShowModal(true); }}>
+            + Connect Repo
+          </button>
+        </div>
       </div>
 
       {/* Website Cards Grid */}
@@ -169,7 +239,7 @@ export default function WebsitesView({ onSelectWebsite, isAuthenticated, onSignI
         <div className={styles.overlay} onClick={() => setShowModal(false)}>
           <div className={styles.modal} onClick={e => e.stopPropagation()}>
             <div className={styles.modalHeader}>
-              <h3 className={styles.modalTitle}>Connect a Website Repository</h3>
+              <h3 className={styles.modalTitle}>Connect a Repository</h3>
               <button className={styles.closeBtn} onClick={() => setShowModal(false)} aria-label="Close">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                   <line x1="18" y1="6" x2="6" y2="18" />
@@ -179,6 +249,7 @@ export default function WebsitesView({ onSelectWebsite, isAuthenticated, onSignI
             </div>
 
             <form onSubmit={handleConnect} className={styles.form}>
+              {notice && <p className={styles.connectionNotice} role="status">{notice}</p>}
               {requestError && <p className={styles.connectionError} role="alert">{requestError}</p>}
               {!isAuthenticated && (
                 <div className={styles.field}>
@@ -187,7 +258,7 @@ export default function WebsitesView({ onSelectWebsite, isAuthenticated, onSignI
                 </div>
               )}
               <div className={styles.field}>
-                <label className={styles.label}>Website Name</label>
+                <label className={styles.label}>Repository Label</label>
                 <input
                   type="text"
                   placeholder="e.g. Acme Pet Store"
@@ -198,19 +269,68 @@ export default function WebsitesView({ onSelectWebsite, isAuthenticated, onSignI
                 />
               </div>
 
-              {isAuthenticated && repositories.length > 0 ? (
+              {isAuthenticated && installation?.connected ? (
+                <>
+                  {repositories.length > 0 ? (
+                    <>
+                      <div className={styles.field}>
+                        <label className={styles.label} htmlFor="github-repository">GitHub repository</label>
+                        <select
+                          id="github-repository"
+                          className={styles.input}
+                          value={selectedRepositoryId}
+                          onChange={(event) => {
+                            const id = event.target.value;
+                            setSelectedRepositoryId(id);
+                            setBranch(repositories.find((repo) => String(repo.id) === id)?.defaultBranch ?? '');
+                          }}
+                          required
+                        >
+                          <option value="">Select a repository</option>
+                          {repositories.map((repository) => <option key={repository.id} value={repository.id}>{repository.fullName}</option>)}
+                        </select>
+                      </div>
+                      <div className={styles.field}>
+                        <label className={styles.label} htmlFor="github-branch">Production branch</label>
+                        <input
+                          id="github-branch"
+                          className={styles.input}
+                          value={branch}
+                          onChange={(event) => setBranch(event.target.value)}
+                          placeholder="main"
+                          required
+                        />
+                      </div>
+                      <div className={styles.field}>
+                        <label className={styles.label} htmlFor="hosted-url">Hosted site URL</label>
+                        <input
+                          id="hosted-url"
+                          type="url"
+                          className={styles.input}
+                          value={hostedUrl}
+                          onChange={(event) => setHostedUrl(event.target.value)}
+                          placeholder="https://your-site.vercel.app"
+                          required
+                        />
+                      </div>
+                      {selectedRepositoryId && (
+                        <p className={styles.storedHint}>
+                          PATCHWORK stores this repository and its hosted URL. Edits are generated from the source via the GitHub App installation; the editor preview loads <strong>{hostedUrl.trim() || 'the hosted site'}</strong>.
+                        </p>
+                      )}
+                    </>
+                  ) : (
+                    <div className={styles.field}>
+                      <span className={styles.label}>No repositories are shared with PATCHWORK yet. Grant access to a repository on GitHub, then refresh.</span>
+                    </div>
+                  )}
+                  <button type="button" className={styles.cancelBtn} onClick={() => void refreshConnections()} disabled={isLoadingRepos}>
+                    {isLoadingRepos ? 'Refreshing…' : 'Refresh repositories'}
+                  </button>
+                </>
+              ) : isAuthenticated && installation === null ? (
                 <div className={styles.field}>
-                  <label className={styles.label} htmlFor="github-repository">GitHub repository</label>
-                  <select
-                    id="github-repository"
-                    className={styles.input}
-                    value={selectedRepositoryId}
-                    onChange={(event) => setSelectedRepositoryId(event.target.value)}
-                    required
-                  >
-                    <option value="">Select a repository</option>
-                    {repositories.map((repository) => <option key={repository.id} value={repository.id}>{repository.fullName}</option>)}
-                  </select>
+                  <span className={styles.label}>Checking GitHub connection…</span>
                 </div>
               ) : isAuthenticated ? (
                 <div className={styles.field}>
@@ -223,8 +343,8 @@ export default function WebsitesView({ onSelectWebsite, isAuthenticated, onSignI
                 <button type="button" className={styles.cancelBtn} onClick={() => setShowModal(false)}>
                   Cancel
                 </button>
-                <button type="submit" className={styles.submitBtn} disabled={!isAuthenticated || !selectedRepositoryId || isConnecting}>
-                  {isConnecting ? 'Connecting…' : 'Connect Website'}
+                <button type="submit" className={styles.submitBtn} disabled={!isAuthenticated || !selectedRepositoryId || !branch.trim() || !hostedUrl.trim() || isConnecting}>
+                  {isConnecting ? 'Connecting…' : 'Connect Repo'}
                 </button>
               </div>
             </form>

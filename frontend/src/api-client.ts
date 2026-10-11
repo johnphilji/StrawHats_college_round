@@ -59,6 +59,7 @@ export interface ProjectRecord {
   repositoryUrl: string | null;
   repositoryIdentifier: string | null;
   productionBranch: string;
+  productionUrl?: string | null;
 }
 
 export interface GitHubRepository {
@@ -178,6 +179,7 @@ export function createProject(input: {
   repositoryUrl: string;
   repositoryIdentifier: string;
   productionBranch: string;
+  productionUrl?: string;
 }): Promise<ProjectRecord> {
   return requestJson<ProjectRecord>('/api/projects', {
     method: 'POST',
@@ -187,6 +189,15 @@ export function createProject(input: {
 
 export function fetchGitHubRepositories(signal?: AbortSignal): Promise<{ repositories: GitHubRepository[]; hasMore: boolean }> {
   return requestJson<{ repositories: GitHubRepository[]; hasMore: boolean }>('/api/github/repositories', { signal });
+}
+
+export interface GitHubInstallation {
+  connected: boolean;
+  installationId?: string;
+}
+
+export function fetchGitHubInstallation(signal?: AbortSignal): Promise<GitHubInstallation> {
+  return requestJson<GitHubInstallation>('/api/github/installation', { signal });
 }
 
 export function beginGitHubInstallation(): Promise<{ url: string }> {

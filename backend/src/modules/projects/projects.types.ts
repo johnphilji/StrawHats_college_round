@@ -5,6 +5,7 @@ export interface Project {
   repositoryUrl: string | null;
   repositoryIdentifier: string | null;
   productionBranch: string;
+  productionUrl?: string | null;
   ownerId: string;
   createdAt: Date;
   updatedAt: Date;
@@ -16,5 +17,6 @@ export interface CreateProjectData {
   repositoryUrl?: string | null;
   repositoryIdentifier?: string | null;
   productionBranch?: string;
+  productionUrl?: string | null;
   ownerId: string;
 }

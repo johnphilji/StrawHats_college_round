@@ -101,6 +101,9 @@ model Project {
   repositoryIdentifier String?  @map("repository_identifier")
   productionBranch     String   @default("main") @map("production_branch")
 
+  // Public URL of the deployed/hosted website used for previewing the site.
+  productionUrl        String?  @map("production_url")
+
   // Supabase Auth user UUID; not a foreign key to auth.users.
   ownerId              String   @map("owner_id")
 

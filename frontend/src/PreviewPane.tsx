@@ -96,6 +96,21 @@ export default function PreviewPane({
     mobile: '375px',
   }[viewport];
 
+  // Preview the project's hosted website when one is connected; otherwise fall
+  // back to the locally running instrumented target.
+  const previewTarget = useMemo(() => {
+    const hosted = website.productionUrl?.trim();
+    if (hosted) {
+      try {
+        const parsed = new URL(hosted);
+        return { url: parsed.toString(), origin: parsed.origin, hosted: true };
+      } catch {
+        // Invalid URL stored on the project — fall back to the local target.
+      }
+    }
+    return { url: TARGET_URL, origin: TARGET_ORIGIN, hosted: false };
+  }, [website.productionUrl]);
+
   // Trusted registry list for the quick tray (backend is source of truth).
   useEffect(() => {
     const controller = new AbortController();
@@ -133,7 +148,7 @@ export default function PreviewPane({
   useEffect(() => {
     const iframe = iframeRef.current;
     if (!iframe) return;
-    const bridge = new PatchworkBridge(iframe, TARGET_ORIGIN, () => editableIdsRef.current, {
+    const bridge = new PatchworkBridge(iframe, previewTarget.origin, () => editableIdsRef.current, {
       onReady: () => undefined,
       onSelect: handleBridgeSelect,
       onStatusChange: (status, detail) => {
@@ -147,7 +162,7 @@ export default function PreviewPane({
       bridge.detach();
       bridgeRef.current = null;
     };
-  }, [frameKey, handleBridgeSelect]);
+  }, [frameKey, handleBridgeSelect, previewTarget.origin]);
 
   const toggleSelectionMode = useCallback(() => {
     const next = !selectionMode;
@@ -196,7 +211,7 @@ export default function PreviewPane({
       <div className={styles.toolbar}>
         <div className={styles.urlBar}>
           <span className={styles.urlDot} />
-          <span className={styles.urlText}>{TARGET_URL}</span>
+          <span className={styles.urlText}>{previewTarget.url}</span>
         </div>
 
         <div className={styles.viewportControls}>
@@ -232,7 +247,7 @@ export default function PreviewPane({
           {selectionMode ? 'Selecting: On' : 'Select Element'}
         </button>
 
-        <div className={styles.branchPill} title={bridgeDetail ?? `Target origin: ${TARGET_ORIGIN}`}>
+        <div className={styles.branchPill} title={bridgeDetail ?? `Target origin: ${previewTarget.origin}`}>
           <span className={styles.branchMain}>
             {statusLabel} • <strong>{website.branch}</strong>
           </span>
@@ -261,10 +276,10 @@ export default function PreviewPane({
       <div className={styles.stage}>
         <div className={styles.viewportFrame} style={{ width: viewportWidth }}>
           <iframe
-            key={frameKey}
+            key={`${previewTarget.url}:${frameKey}`}
             ref={iframeRef}
             title="Instrumented target website"
-            src={TARGET_URL}
+            src={previewTarget.url}
             className={styles.siteFrame}
           />
         </div>
