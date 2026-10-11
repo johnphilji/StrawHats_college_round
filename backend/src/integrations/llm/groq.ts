@@ -7,6 +7,8 @@ export type GroqPatchRequest = {
   componentId: string;
   instruction: string;
   componentContext?: string;
+  /** Bounded site style guide (tokens, reusable classes, component CSS). */
+  styleContext?: string;
 };
 
 export type GroqPatchResult = {
@@ -33,23 +35,34 @@ export function buildGroqPrompt(input: GroqPatchRequest): string {
   const componentId = input.componentId || 'unknown-component';
   const instruction = input.instruction || 'Keep the requested change minimal and targeted.';
   const context = input.componentContext || 'The component is mapped to a known source file in this controlled repo.';
+  const styleContext = input.styleContext?.trim();
 
-  return [
+  const sections = [
     'You are PATCHWORK, a constrained website patch generator.',
     'Your job is to return a minimal code diff for a single known component.',
     `Component ID: ${componentId}`,
     `Component context: ${context}`,
-    `User instruction: ${instruction}`,
+    `Site style guide (ground truth for how the current page looks):${styleContext ? `\n${styleContext}` : ' none available — infer the visual style from the component context source code.'}`,
+    `User instruction (this is the change the user actually wants): ${instruction}`,
     'Rules:',
     '- Only edit the mapped file for this component.',
     '- Avoid unrelated files, config changes, or broad refactors.',
     '- Keep the patch small and easy to validate.',
     '- Do not rewrite the entire file unless absolutely necessary.',
+    '- STYLE CONSISTENCY (critical): the result must look like part of the current page and must not look odd or out of place.',
+    '  - Reuse the design tokens (CSS custom properties) from the site style guide instead of inventing new colors, fonts, or sizes.',
+    '  - Reuse existing utility/component classes instead of adding throwaway styling.',
+    '  - Match the current page design language: typography, spacing, radius, shadows, and tone should stay consistent with the existing component.',
+    '  - The User instruction always takes priority: if it conflicts with the style guide, apply the user intent in the closest style-consistent way (e.g. "make it green" -> use the site green token or a matching class, not an unrelated neon web color).',
+    '  - You may only modify the mapped component file. Prefer existing classes; when a visual change needs a value, express it with a CSS variable reference or a minimal inline style so the change stays within this single file.',
+    '  - Never introduce unrelated colors, fonts, images, external assets, or new dependencies.',
     '- Return only JSON with fields: diff, changedFiles, summary.',
     'JSON format example:',
     '{"diff":"--- a/src/components/CheckoutButton.tsx\\n+++ b/src/components/CheckoutButton.tsx\\n@@\\n- Checkout\\n+ Continue to Payment","changedFiles":["src/components/CheckoutButton.tsx"],"summary":"Updated checkout CTA copy."}',
     'Only return JSON, no markdown fences, no prose outside the JSON object.',
-  ].join('\n');
+  ];
+
+  return sections.join('\n');
 }
 
 export function parseGroqResponse(raw: string): { diff: string; changedFiles: string[]; summary: string } {

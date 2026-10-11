@@ -18,6 +18,7 @@ import {
   getPatchProvider,
   type PatchProvider,
 } from '../integrations/llm/provider';
+import { buildStyleContext } from './style-context.service';
 import { logger } from '../config/logger';
 
 /**
@@ -94,6 +95,25 @@ export class EditOrchestrationService {
     const sourceCode = await repository.readFile(entry.filePath);
     const beforeHash = sha256(sourceCode);
 
+    // 2b. Bounded read-only style guide so the patch stays visually consistent
+    // with the current page. Missing/unreadable style files never block editing.
+    let styleContext = '';
+    try {
+      styleContext = await buildStyleContext({
+        componentFilePath: entry.filePath,
+        sourceCode,
+        reader: { readFile: (filePath) => repository.readFile(filePath) },
+      });
+      if (styleContext) {
+        logger.info({ componentId: entry.id, styleContextChars: styleContext.length }, 'Style context gathered for editor proposal');
+      }
+    } catch (styleError) {
+      logger.warn(
+        { componentId: entry.id, errorName: styleError instanceof Error ? styleError.name : 'unknown' },
+        'Could not gather style context for editor proposal',
+      );
+    }
+
     // 3. Provider generation (mock until a real adapter is configured).
     const generated = await this.patchProvider.generate({
       componentId: entry.id,
@@ -110,6 +130,7 @@ export class EditOrchestrationService {
         route: entry.route,
         dataSource: entry.dataSource,
         notes: entry.notes,
+        styleContext,
       },
     });
 

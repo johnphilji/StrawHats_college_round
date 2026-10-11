@@ -173,6 +173,7 @@ export class GroqPatchProvider implements PatchProvider {
       componentId: input.componentId,
       instruction: input.instruction,
       componentContext,
+      styleContext: context.styleContext,
     });
 
     if (result.status !== 'success') {

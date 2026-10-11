@@ -13,6 +13,7 @@ import {
   MockPatchProvider,
   getPatchProvider,
   sanitizeInstructionNote,
+  type PatchProviderInput,
 } from '../../src/integrations/llm/provider';
 import {
   validatePatchDiff,
@@ -331,6 +332,39 @@ describe('EditOrchestrationService', () => {
     expect(fs.readFileSync(path.join(noAnchor, 'src/components/Hero.jsx'), 'utf8')).toBe(
       'export const Hero = () => null;\n',
     );
+  });
+
+  it('passes a bounded style context to the provider for style-consistent changes', async () => {
+    const styleRepo = makeTempRepo({
+      'src/index.css': ':root { --gold: #d4af37; --maroon: #4a0e1e; } .btn { padding: 4px; }',
+      'src/components/Hero.css': '.hero__title { color: var(--maroon); }',
+      'src/components/Hero.jsx': 'import "./Hero.css";\n' + HERO_SOURCE,
+    });
+    let receivedStyleContext: string | null = null;
+    const spyProvider = {
+      name: 'spy',
+      async generate(input: PatchProviderInput) {
+        receivedStyleContext = input.context.styleContext ?? null;
+        return {
+          provider: 'spy',
+          simulated: true,
+          diff: '',
+          changedFiles: [],
+          summary: 'spy',
+          warnings: [],
+        };
+      },
+    };
+
+    await new EditOrchestrationService({
+      resolver: new ComponentResolverService(registry),
+      repositoryProvider: new LocalRepositoryProvider(styleRepo),
+      patchProvider: spyProvider,
+    }).generateEditProposal('hero-heading', 'Make it gold');
+
+    expect(receivedStyleContext).toContain('--gold: #d4af37');
+    expect(receivedStyleContext).toContain('.btn');
+    expect(receivedStyleContext).toContain('.hero__title');
   });
 });
 

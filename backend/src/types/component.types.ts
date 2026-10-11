@@ -49,6 +49,12 @@ export interface ResolvedComponentContext {
   route?: string;
   dataSource?: string;
   notes?: string;
+  /**
+   * Bounded, read-only description of the target site's visual style
+   * (design tokens, reusable classes, co-located stylesheet) so the LLM can
+   * make changes that stay visually consistent with the current page.
+   */
+  styleContext?: string;
 }
 
 /**

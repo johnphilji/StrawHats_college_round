@@ -2,6 +2,7 @@ import { buildPatchBranchName } from '../integrations/git/branch';
 import { getPatchProvider, type PatchProvider } from '../integrations/llm/provider';
 import { componentResolverService, type ComponentResolverService } from './component-resolver.service';
 import { applyParsedDiff, parseUnifiedDiff, validatePatchDiff } from './patch-validation.service';
+import { buildStyleContext } from './style-context.service';
 import { githubAppService, type GithubAppService } from './github-app.service';
 import { projectsService } from '../modules/projects/projects.service';
 import { patchesService } from '../modules/patches/patches.service';
@@ -135,6 +136,24 @@ export class PatchGenerationService {
         const source = await this.github.readSource(user, repositoryId, entry.filePath, baseCommitSha);
         if (source.path !== entry.filePath) throw conflict('GitHub returned source for a different path.');
 
+        // Bounded read-only style guide so the generated change stays visually
+        // consistent with the current page. Failures here never block the edit.
+        let styleContext = '';
+        try {
+          styleContext = await buildStyleContext({
+            componentFilePath: entry.filePath,
+            sourceCode: source.source,
+            reader: {
+              readFile: async (filePath) => (await this.github.readSource(user, repositoryId, filePath, baseCommitSha)).source,
+            },
+          });
+        } catch (styleError) {
+          logger.warn(
+            { projectId, patchId, componentId: entry.id, errorName: styleError instanceof Error ? styleError.name : 'unknown' },
+            'Could not gather style context for persisted patch generation',
+          );
+        }
+
         const generated = await this.provider.generate({
           componentId: entry.id,
           instruction: patch.prompt,
@@ -150,6 +169,7 @@ export class PatchGenerationService {
             route: entry.route,
             dataSource: entry.dataSource,
             notes: entry.notes,
+            styleContext,
           },
         });
         if (generated.errors?.length) throw validationError('Groq could not generate a usable patch.', { errors: generated.errors });
